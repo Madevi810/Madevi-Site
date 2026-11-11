@@ -17,7 +17,7 @@ Status: daftar persiapan, belum aktif atau diuji. Ade memilih penyedia, paket, a
 | Monitoring | Penyedia, penerima alert, retensi log, eskalasi dan target kinerja belum dipilih. File contoh bukan monitoring aktif. |
 | Rahasia | Secret manager atau environment privat server; `BETTER_AUTH_SECRET` acak minimal 32 karakter dan `BETTER_AUTH_URL` origin HTTPS yang disetujui. Setiap environment memakai rahasia berbeda. |
 | Admin awal | `OWNER_USERNAME`, `OWNER_EMAIL`, `OWNER_PASSWORD` disediakan secara privat hanya saat bootstrap; aktifkan MFA dan simpan kode pemulihan secara aman. Ade tetap admin tunggal. |
-| Repo / CI / image | Ade menentukan repository dan akses. Pipeline dan Dockerfile ada, namun belum terbukti dijalankan di GitHub / Docker. Jangan memberi rahasia CI pada PR tidak tepercaya. |
+| Repo / CI / image | Ade menentukan repository dan akses. Audit yang diterima dari pengembang melaporkan pipeline GitHub Actions berhasil pada commit 121c646, termasuk backup/restore database CI terisolasi; status run terbaru belum terverifikasi dari lingkungan ini. Dockerfile belum dibuktikan dibangun atau dijalankan. Jangan memberi rahasia CI pada PR tidak tepercaya. |
 | Audit keamanan | Auditor independen, lingkup dan jadwal menunggu Ade; audit tidak digantikan tes otomatis. |
 | Dukungan dan kebijakan | Kontak nyata, kebijakan privasi, ketentuan, perlindungan anak, penanganan laporan dan retensi menunggu keputusan/tinjauan Ade. |
 | Analitik / realtime / pembayaran | Analitik dan realtime belum diaktifkan. Line tetap ditutup; pembayaran tidak termasuk cakupan. |

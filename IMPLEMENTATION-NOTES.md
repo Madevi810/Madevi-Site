@@ -1,14 +1,11 @@
 # Catatan implementasi dan penyerahan
 
-- Status: pekerjaan pondasi awal, belum siap produksi dan belum diterbitkan.
-- Stack aktual: Next.js 16.4.5, React 19.3.1, TypeScript 7.0.2, Node 24 LTS, PostgreSQL via pg, Better Auth 1.7.17. Versi lain tertera di package-lock.json.
-- Akun tunggal seluruh ruang; hanya admin tunggal. Pengecualian demo berhenti di development; admin non-demo memerlukan MFA untuk mengakses data admin.
-- Google dikonfigurasi opsional tetapi belum diuji dengan penyedia; sign-in menggunakan nomor telepon belum diterapkan; pengujian memakai PGlite dan PostgreSQL server terpisah pada lingkungan lokal.
-- Foto profil disimpan dalam database sebagai gambar WebP hasil pemrosesan. Infrastruktur penyimpanan media skala besar belum dipilih.
-- Ada uji pemulihan fisik lokal; belum ada backup otomatis, uji restore pg_dump/pg_restore, observabilitas nyata, sistem notifikasi, moderasi sosial, kapasitas trafik terukur, atau uji keamanan independen.
-- Fitur konten dan taksonomi ruang ditunda; tidak ada data riil dalam implementasi atau arsip.
-- Versi produk sekarang 0.0.0.4; nomor npm 0.0.0-4 adalah representasi teknis yang valid dalam format package npm, bukan penomoran tampilan Madevi.
+Status: WARNING. Aplikasi masih dalam pematangan dan belum siap untuk pengguna nyata.
 
-- Tailwind disiapkan sebagai dasar; banyak class CSS lama masih digunakan. Deploy, Docker/CI nyata dan penyedia belum diuji.
-
-- Pengelolaan konten dan halaman baca masih terbatas pada teks sederhana; editor, media isi, pencarian lengkap, dan UI seluruh ruang belum selesai.
+- Versi tampilan v0.0.0.16; versi npm `0.0.0-16` adalah representasi teknis yang valid. Stack dan versi aktual tercantum dalam `package.json` dan lockfile.
+- Satu akun dipakai bersama; admin non-demo memerlukan MFA. Akun demo dipertahankan hanya untuk development lokal terisolasi sesuai keputusan pengembang.
+- Pendaftaran, sesi, profil, admin, notifikasi, dan laporan memiliki implementasi serta pengujian lokal. Foto profil diproses menjadi WebP dan disimpan di database. Login nomor telepon belum tersedia; Google OAuth belum diuji dengan penyedia asli.
+- Typecheck, tes unit, build dan integrasi lokal telah dijalankan. Browser Chromium aplikasi telah diuji secara lokal, termasuk profil dan admin; cakupan aksesibilitas terbatas. Tes browser tidak termasuk dalam workflow CI saat ini.
+- Menurut audit yang diterima dari pengembang, GitHub Actions untuk commit `121c646` berhasil, termasuk `pg_dump` dan `pg_restore` pada database CI terisolasi. Status run pada commit yang lebih baru belum dapat diverifikasi dari lingkungan ini. Backup otomatis dan pemulihan di lingkungan tujuan belum dibuktikan.
+- Komponen global lama telah dipindahkan ke utility Tailwind dalam lingkup yang diuji; audit visual dan aksesibilitas menyeluruh belum lengkap. Docker belum dibuktikan berjalan.
+- Catatan pengujian dan keputusan lengkap berada di Pondasi, yang dipelihara terpisah dari repo aplikasi. Lihat `README.md` dan `CHANGELOG.md` untuk ringkasan dalam repo.

@@ -1,3 +1,8 @@
+# v0.0.0.16 — pembaruan catatan implementasi, WARNING
+
+- Perbarui catatan implementasi dan bukti pengujian yang telah kedaluwarsa.
+- Catat laporan audit mengenai CI v0.0.0.13 dan batas verifikasi CI terbaru.
+
 # v0.0.0.15 — ketahanan pengaturan profil, WARNING
 
 - Tampilkan kesalahan saat pemuatan profil gagal atau koneksi terputus ketika menyimpan profil dan foto.

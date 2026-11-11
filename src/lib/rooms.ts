@@ -1,6 +1,6 @@
 import { Atom, Wrench, GraduationCap, ShoppingBag, Calculator, Sparkles, MessageCircle } from "lucide-react";
 
-export const VERSION = "v0.0.0.15";
+export const VERSION = "v0.0.0.16";
 export const rooms = [
   { slug: "explore", name: "Explore & Learn", color: "#7166dc", icon: Atom },
   { slug: "tutorial", name: "Tutorial & Problem Solve", color: "#e68c55", icon: Wrench },
