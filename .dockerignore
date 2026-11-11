@@ -1,0 +1,9 @@
+node_modules
+.next
+.env*
+!.env.example
+.git
+*.dump
+*.log
+coverage
+tsconfig.tsbuildinfo

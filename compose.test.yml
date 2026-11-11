@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: madevi_test
+      POSTGRES_PASSWORD: local-test-only
+      POSTGRES_DB: madevi_ci_test
+    ports:
+      - "127.0.0.1:25435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U madevi_test -d madevi_ci_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Ephemeral: no persistent volume and no production data.

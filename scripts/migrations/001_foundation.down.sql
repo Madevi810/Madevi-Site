@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS madevi_media_variants;
+DROP TABLE IF EXISTS madevi_rate_limits;
+DROP TABLE IF EXISTS madevi_security_events;
+DROP TABLE IF EXISTS madevi_moderation_events;
+DROP TABLE IF EXISTS madevi_content_relations;
+DROP TABLE IF EXISTS madevi_content_revisions;
+DROP TABLE IF EXISTS madevi_content;
+DROP TRIGGER IF EXISTS madevi_role_change_trigger ON "user";
+DROP FUNCTION IF EXISTS madevi_audit_role_change();
+DROP INDEX IF EXISTS madevi_single_admin_idx;

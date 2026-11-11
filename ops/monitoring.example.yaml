@@ -1,0 +1,15 @@
+# Contoh rancangan; tidak mengaktifkan layanan atau pengiriman alert.
+enabled: false
+checks:
+  - name: liveness
+    path: /api/health/live
+    interval_seconds: 60
+  - name: database_readiness
+    path: /api/health/ready
+    interval_seconds: 60
+alerts:
+  - signal: readiness_failure
+    consecutive_failures: 3
+    receiver: unset
+  - signal: backup_failure
+    receiver: unset

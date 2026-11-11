@@ -1,0 +1,45 @@
+name: Madevi CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: madevi_test
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: madevi_ci_test
+        ports: ["25435:5432"]
+        options: >-
+          --health-cmd "pg_isready -U madevi_test -d madevi_ci_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck && npm test
+      - run: npm run test:integration
+        env:
+          MADEVI_TEST_DATABASE_URL: postgresql://madevi_test:local-test-only@127.0.0.1:25435/madevi_ci_test
+          MADEVI_TEST_BUILD: "1"
+          MADEVI_TEST_LOAD: "1"
+      - name: Backup and restore isolated CI database
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$PG_CONTAINER" pg_dump -U madevi_test -Fc -f /tmp/madevi-ci.dump madevi_ci_test
+          docker exec "$PG_CONTAINER" createdb -U madevi_test madevi_ci_restore
+          docker exec "$PG_CONTAINER" pg_restore -U madevi_test --exit-on-error -d madevi_ci_restore /tmp/madevi-ci.dump
+          test "$(docker exec "$PG_CONTAINER" psql -U madevi_test -d madevi_ci_restore -tAc "SELECT count(*) FROM madevi_schema_migrations WHERE version='001_foundation'")" = "1"
+      - run: npm audit --omit=dev --audit-level=high

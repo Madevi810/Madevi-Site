@@ -1,0 +1,18 @@
+node_modules/
+.next/
+.env*
+!.env.example
+*.log
+coverage/
+
+*.dump
+*.backup
+*.tsbuildinfo
+
+# Backup nyata tidak boleh disimpan di repository.
+database/backups/*
+!database/backups/.gitkeep
+
+# Keluaran dan metadata sementara audit tampilan.
+out/
+audit-preview/.openai/

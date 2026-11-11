@@ -1,0 +1,4 @@
+"use client";
+import { useEffect,useState } from "react";
+import { adminPanel,adminTitle,eyebrow } from "./styles";
+export function AdminSystem(){const [status,setStatus]=useState("Memeriksa…");useEffect(()=>{fetch('/api/health/ready',{cache:'no-store'}).then(r=>setStatus(r.ok?'Terhubung':'Belum siap')).catch(()=>setStatus('Belum siap'))},[]);return <><p className={eyebrow}>ADMIN / SISTEM</p><div className={adminTitle}><div><h1>Sistem dan pemulihan</h1><p>Status layanan dan kesiapan pemulihan.</p></div></div><section className={adminPanel}><h2>Database</h2><p>Status: <strong>{status}</strong></p></section><section className={adminPanel}><h2>Backup</h2><p>Jadwal dan penyimpanan backup belum dikonfigurasi.</p></section><section className={adminPanel}><h2>Rollback</h2><p>Rollback aplikasi dan pemulihan database memerlukan layanan, izin, dan prosedur terverifikasi. Belum tersedia.</p></section></>}
