@@ -1,3 +1,12 @@
+# v0.0.0.15 — ketahanan pengaturan profil, WARNING
+
+- Tampilkan kesalahan saat pemuatan profil gagal atau koneksi terputus ketika menyimpan profil dan foto.
+
+# v0.0.0.14 — penguatan tes browser, WARNING
+
+- Perbaiki selector tes browser dan verifikasi isi foto profil berubah saat diganti.
+- Belum siap pengguna nyata; layanan dan uji lingkungan tujuan masih diperlukan.
+
 # v0.0.0.13 — penerapan tata letak Default, WARNING
 
 - Terapkan susunan beranda, sidebar, profil dan dashboard admin yang telah ditinjau di site audit; pertahankan tema dan efek project.
