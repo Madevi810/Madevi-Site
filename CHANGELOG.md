@@ -1,3 +1,12 @@
+# v0.0.0.17 — pematangan profil, akses dan pengujian, WARNING
+
+- Batasi endpoint update-user agar tidak melewati validasi profil; perubahan nama valid tetap didukung dan diaudit.
+- Pertahankan spasi kata sandi, cegah penyimpanan profil/privasi sebelum data dimuat, dan tambahkan retry.
+- Pertahankan tujuan navigasi dari profil admin; perbaiki fokus kontrol yang dinonaktifkan.
+- Tangani konflik slug bersamaan sebagai 409; audit unggahan avatar dan bedakan kegagalan penyimpanan dari gambar tidak valid.
+- Perluas tes API/browser untuk kondisi gagal, pemulihan, konkurensi dan OAuth tanpa konfigurasi; dukung CA proxy opsional dalam build Docker tanpa menonaktifkan TLS.
+- Lihat `ops/verification-v17.md` untuk hasil, metode dan batas verifikasi.
+
 # v0.0.0.16 — pembaruan catatan implementasi, WARNING
 
 - Perbarui catatan implementasi dan bukti pengujian yang telah kedaluwarsa.

@@ -1,7 +1,11 @@
 FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --no-audit --no-fund
+# Optional trusted CA for development environments with an HTTPS proxy.
+# BuildKit mounts it only for installation; it is not copied into the image.
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    npm ci --no-audit --no-fund
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /app

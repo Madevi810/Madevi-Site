@@ -26,7 +26,7 @@ try{
   const app=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3001'],{stdio:'ignore',env:{...env,NODE_ENV:'production',MADEVI_ENV:'staging',MADEVI_DEMO_MODE:'false',DATABASE_URL:'postgresql://madevi@127.0.0.1:25435/madevi_ci_test',BETTER_AUTH_URL:'https://localhost',BETTER_AUTH_SECRET:'local-integration-test-secret-only-at-least-32'}});
   try{
    let ready=false;for(let i=0;i<30;i++){try{if((await fetch(origin)).ok){ready=true;break}}catch{}await new Promise(r=>setTimeout(r,500))}assert.ok(ready,'production server');
-   const {chromium}=await import('playwright');const browser=await chromium.launch({headless:true,executablePath:process.env.MADEVI_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--single-process']});
+   const {chromium}=await import('playwright');const browser=await chromium.launch({headless:true,executablePath:process.env.MADEVI_CHROMIUM_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
    try{const page=await browser.newPage({viewport:{width:390,height:844}});const violations=[];page.on('console',m=>{if(m.type()==='error'&&/content security policy/i.test(m.text()))violations.push(m.text())});await page.goto(origin);await page.getByRole('button',{name:'Buka menu'}).click();await page.getByText('Ruang Madevi',{exact:true}).last().waitFor();assert.deepEqual(violations,[]);console.log('Lulus: build production, nonce CSP dan interaksi sidebar di browser.')}finally{await browser.close()}
   }finally{app.kill('SIGTERM');await new Promise(r=>app.once('exit',r))}
  }

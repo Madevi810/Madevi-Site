@@ -11,6 +11,8 @@ import { AdminSystem } from "./admin-system";
 import { NotificationCenter } from "./notification-center";
 import { topBar, brand, brandMark, headerRight, adminSearch, searchInput, roundControl, popup, popupTitle, popupRow, popupButton, drawerLayer, backdrop, drawer, drawerHeader, drawerBrand, drawerBrandMark, adminMain, eyebrow, adminTitle, adminGrid, adminStat, adminPanel, adminRow, userRow, avatar, adminMenu, adminLogout, roomPill, roomPillText, fieldLabel, inputControl, statusMessage, textButton } from "./styles";
 import { rooms, VERSION } from "@/lib/rooms";
+const panels = ["dashboard", "users", "reports", "content", "notifications", "system"] as const;
+type Panel = typeof panels[number];
 type ReportRow = {
   id: string | number;
   body: string;
@@ -40,7 +42,7 @@ export function AdminShell({
   username?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [panel, setPanel] = useState<"dashboard" | "users" | "reports" | "content" | "notifications" | "system">("dashboard");
+  const [panel, setPanel] = useState<Panel>("dashboard");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [reportPage, setReportPage] = useState(1);
@@ -58,7 +60,8 @@ export function AdminShell({
   const [profileName, setProfileName] = useState(name);
   const [dbStatus, setDbStatus] = useState("Memeriksa");
   useEffect(() => {
-    if (!profile && new URLSearchParams(window.location.search).get("panel") === "reports") setPanel("reports");
+    const requested = new URLSearchParams(window.location.search).get("panel");
+    if (!profile && panels.includes(requested as Panel)) setPanel(requested as Panel);
   }, [profile]);
   useEffect(() => {
     if (!notice) return;
@@ -196,23 +199,23 @@ export function AdminShell({
           }}><LayoutDashboard size={19} /><strong className={roomPillText}>Dashboard</strong><ArrowUpRight className="text-madevi-muted" size={16} /></button><button className={roomPill} onClick={() => {
             setPanel("users");
             setOpen(false);
-            if (profile) window.location.href = "/admin";
+            if (profile) window.location.href = "/admin?panel=users";
           }}><Users size={19} /><strong className={roomPillText}>Pengguna</strong><ArrowUpRight className="text-madevi-muted" size={16} /></button><button className={roomPill} onClick={() => {
             setPanel("content");
             setOpen(false);
-            if (profile) window.location.href = "/admin";
+            if (profile) window.location.href = "/admin?panel=content";
           }}><FileText size={19} /><strong className={roomPillText}>Konten</strong><ArrowUpRight className="text-madevi-muted" size={16} /></button><button className={roomPill} onClick={() => {
             setPanel("notifications");
             setOpen(false);
-            if (profile) window.location.href = "/admin";
+            if (profile) window.location.href = "/admin?panel=notifications";
           }}><Bell size={19} /><strong className={roomPillText}>Notifikasi dan pesan</strong><ArrowUpRight className="text-madevi-muted" size={16} /></button><button className={roomPill} onClick={() => {
             setPanel("system");
             setOpen(false);
-            if (profile) window.location.href = "/admin";
+            if (profile) window.location.href = "/admin?panel=system";
           }}><Database size={19} /><strong className={roomPillText}>Sistem dan backup</strong><ArrowUpRight className="text-madevi-muted" size={16} /></button><button className={roomPill} onClick={() => {
             setPanel("reports");
             setOpen(false);
-            if (profile) window.location.href = "/admin";
+            if (profile) window.location.href = "/admin?panel=reports";
           }}><Activity size={19} /><strong className={roomPillText}>Laporan Masalah</strong><ArrowUpRight className="text-madevi-muted" size={16} /></button></nav><button className={adminLogout} onClick={async () => {
           await authClient.signOut();
           window.location.href = "/admin";

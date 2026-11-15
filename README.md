@@ -1,4 +1,4 @@
-# MADEVI — project website v0.0.0.16
+# MADEVI — project website v0.0.0.17
 
 Website pendidikan dan jasa digital dengan tujuh ruang. Ini adalah **implementasi awal untuk pengujian**, belum dinyatakan siap untuk produksi atau data pengguna nyata. Tujuh ruang dan taksonominya sengaja belum diisi.
 
@@ -31,6 +31,8 @@ Diperlukan Node.js 24 LTS atau versi LTS yang kompatibel, npm, dan PostgreSQL ya
 
 ## Pengujian
 
+Ringkasan verifikasi lokal terbaru dan batasannya: [ops/verification-v17.md](ops/verification-v17.md).
+
 `npm test` menguji aturan isolasi demo dan konfigurasi email. `npm run typecheck` memeriksa TypeScript. `npm run test:integration` membuat database PostgreSQL **PGlite sementara di memori** dan server SMTP lokal palsu untuk pengujian; tes ini tidak menggantikan uji PostgreSQL server sungguhan, SMTP asli, atau Google OAuth. Ia menguji migrasi, dua akun demo, verifikasi email uji, kontrol akses admin, pemblokiran/pemulihan, sesi, nama pengguna tetap, foto, laporan dan MFA. Tes menggunakan port lokal 25433, 25434, 3000 dan data sementara.
 
 `npm run build` membangun aplikasi; konfigurasi database dan rahasia tetap diperlukan saat membangun dan menjalankan. Karena build memakai `NODE_ENV=production`, wajib mengatur `MADEVI_ENV=staging` atau `production` dan `BETTER_AUTH_URL` HTTPS; jangan menggunakan mode demo. Konfigurasi development lokal `MADEVI_ENV=dev` hanya untuk menjalankan `npm run dev`. Untuk pemeriksaan visual otomatis opsional, pasang browser Playwright yang sesuai lalu gunakan `MADEVI_VISUAL_CHECK=1 npm run test:integration`.
@@ -50,12 +52,12 @@ Media memakai kontrak penyimpanan; implementasi saat ini tetap PostgreSQL dengan
 
 Validasi lingkungan, CSP nonce, HSTS untuk produksi, rate limit bersama PostgreSQL, log keamanan terstruktur, health live/ready dan contoh CI/container telah ditambahkan. Jangan mengaktifkan `TRUST_PROXY_HEADERS` kecuali reverse proxy yang terpercaya menghapus header dari klien dan mengisi `X-Real-IP`; secara bawaan semua permintaan tanpa identitas proxy memakai satu bucket bersama. Lihat `ops/environments.md` dan `ops/operations.md`. Rate limit di database adalah perlindungan awal, bukan mitigasi DDoS skala besar. Pengumpulan log, monitoring dan alert pihak ketiga belum tersambung.
 
-Untuk uji lokal: `npm run typecheck`, `npm test`, dan `npm run test:integration`. Pengujian integrasi memakai database sementara PGlite; dengan `MADEVI_TEST_DATABASE_URL` dapat memakai PostgreSQL lokal dengan nama database `madevi_ci_*` yang terisolasi. `scripts/test-real-postgres.mjs` dapat menguji PostgreSQL lokal terisolasi dan pemulihan salinan fisik saat server berhenti, dengan `MADEVI_POSTGRES_BIN_DIR` menunjuk binari `initdb` dan `pg_ctl`. Skrip tersebut membuat dan menghapus cluster sementara miliknya sendiri. Dockerfile dan CI tersedia, tetapi belum diuji lewat Docker/GitHub Actions di lingkungan ini. Backup otomatis dan restore dengan `pg_dump`/`pg_restore` masih memerlukan uji pada lingkungan tujuan. Detail hasil dan batas pengujian disimpan bersama dokumen Pondasi yang terpisah.
+Untuk uji lokal: `npm run typecheck`, `npm test`, dan `npm run test:integration`. Pengujian integrasi memakai database sementara PGlite; dengan `MADEVI_TEST_DATABASE_URL` dapat memakai PostgreSQL lokal dengan nama database `madevi_ci_*` yang terisolasi. `scripts/test-real-postgres.mjs` dapat menguji PostgreSQL lokal terisolasi dan pemulihan salinan fisik saat server berhenti, dengan `MADEVI_POSTGRES_BIN_DIR` menunjuk binari `initdb` dan `pg_ctl`. Skrip tersebut membuat dan menghapus cluster sementara miliknya sendiri. Build dan runtime Docker lokal telah diuji; CI terakhir yang terverifikasi pada riwayat proyek adalah v0.0.0.16, status CI v0.0.0.17 perlu diperiksa di GitHub Actions. Backup otomatis dan restore dengan `pg_dump`/`pg_restore` masih memerlukan uji pada lingkungan tujuan. Detail hasil dan batas pengujian disimpan bersama dokumen Pondasi yang terpisah.
 
 
 ## Penyiapan server v0.0.0.3
 
-Folder ini dapat menjadi akar repository Git dan berdiri sendiri dari dokumen Pondasi. `compose.yml` dan `ops/reverse-proxy.example.md` adalah contoh untuk disesuaikan setelah provider, database dan domain tersedia; belum diuji di Docker atau server tujuan. Database dan kredensial tidak disertakan. Ikuti `ops/deploy-checklist.md` sebelum menerima data nyata. Folder `database/` menjelaskan migrasi tanpa menyalin berkasnya.
+Folder ini dapat menjadi akar repository Git dan berdiri sendiri dari dokumen Pondasi. `compose.yml` dan `ops/reverse-proxy.example.md` adalah contoh untuk disesuaikan setelah provider, database dan domain tersedia; Docker lokal telah diuji seperti dicatat pada laporan verifikasi; server tujuan belum diuji. Database dan kredensial tidak disertakan. Ikuti `ops/deploy-checklist.md` sebelum menerima data nyata. Folder `database/` menjelaskan migrasi tanpa menyalin berkasnya.
 
 Tailwind dan PostCSS telah dipasang sebagai dasar, tanpa preflight untuk menjaga tampilan saat ini. Token warna lama tetap dipakai. Migrasi sebagian besar class CSS ke utility Tailwind dan pemeriksaan semua layar belum selesai; jangan menganggap seluruh styling sudah dimigrasikan.
 

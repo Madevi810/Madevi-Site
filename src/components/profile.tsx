@@ -106,7 +106,10 @@ export function Profile({
     event.preventDefault();
     setMessage("");
     const form = new FormData(event.currentTarget);
-    const get = (key: string) => String(form.get(key) || "").trim();
+    const get = (key: string) => {
+      const value = String(form.get(key) || "");
+      return key === "password" || key === "confirm" ? value : value.trim();
+    };
     if (view === "signup" && signupStep === 1) {
       if (get("password") !== get("confirm")) {setPasswordMismatch(true);return;}
       setPasswordMismatch(false);
@@ -307,11 +310,19 @@ function ProfileSettings({
   const [image, setImage] = useState(`/api/account/avatar?v=${Date.now()}`);
   const [missing, setMissing] = useState(false);
   const [message, setMessage] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [saving, setSaving] = useState(false);
   useEffect(() => {
+    const controller = new AbortController();
+    setLoaded(false);
     fetch("/api/account/profile", {
-      cache: "no-store"
+      cache: "no-store", signal: controller.signal
     }).then(r => { if (!r.ok) throw Error(); return r.json(); }).then(d => {
-      if (d.profile) {
+      if (!d.profile) throw Error();
+      if (!controller.signal.aborted) {
+        setLoaded(true);
+        setMessage(current => ["Profil belum tersedia.", "Profile unavailable."].includes(current) ? "" : current);
         setValue(d.profile.name || name);
         setBirthDate(d.profile.birthDate || "");
         setCity(d.profile.city || "");
@@ -319,8 +330,9 @@ function ProfileSettings({
         setUsername(d.profile.username || "");
         onProfileUpdate({username:d.profile.username || "", city:d.profile.city || ""});
       }
-    }).catch(() => setMessage(t("Profil belum tersedia.", "Profile unavailable.")));
-  }, [name, english]);
+    }).catch(() => {if (!controller.signal.aborted) setMessage(t("Profil belum tersedia.", "Profile unavailable."));});
+    return () => controller.abort();
+  }, [name, english, retry]);
   async function upload(file: File) {
     if (file.size > 1000000 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setMessage(t("Foto harus JPG, PNG, atau WebP maksimal 1 MB.", "Photo must be JPG, PNG, or WebP up to 1 MB."));
@@ -343,6 +355,8 @@ function ProfileSettings({
   }
   return <><PhotoEditor english={english} image={missing ? "" : image} onImageError={() => setMissing(true)} onFile={file => { void upload(file); }} onRemove={() => { void (async () => { try { const r = await fetch("/api/account/avatar", {method:"DELETE"}); if(r.ok){setMissing(true);onAvatar();setMessage(t("Foto dihapus.", "Photo removed."));} else setMessage(t("Foto belum dapat dihapus.", "Could not remove photo.")); } catch { setMessage(t("Foto belum dapat dihapus.", "Could not remove photo.")); } })(); }} /><form className={formLayout} onSubmit={async e => {
       e.preventDefault();
+      if (!loaded || saving) return;
+      setSaving(true);
       try {
       const r = await fetch("/api/account/profile", {
         method: "PATCH",
@@ -359,7 +373,8 @@ function ProfileSettings({
       setMessage(r.ok ? t("Profil tersimpan.", "Profile saved.") : t("Profil belum tersimpan.", "Profile not saved."));
       if (r.ok) {onProfileUpdate({username,city}); await refetch();}
       } catch { setMessage(t("Profil belum tersimpan.", "Profile not saved.")); }
-    }}><h3>{t("Pengaturan akun", "Account settings")}</h3><div className="flex flex-col gap-madevi-8">{([[t("Nama lengkap", "Full name"), "name"], [t("Tanggal lahir", "Date of birth"), "date"], [t("Kota asal", "City of origin"), "city"], [t("Nomor telepon (opsional)", "Phone (optional)"), "phone"]] as const).map(([label, key]) => <details key={key} className="rounded-madevi-20 border border-madevi-line bg-madevi-surface"><summary className="flex cursor-pointer list-none items-center justify-between gap-madevi-12 px-madevi-15 py-madevi-13 font-bold">{label}<ChevronRight size={17} /></summary><div className="px-madevi-15 pb-madevi-13"><Field label={label} type={key === "date" ? "date" : key === "phone" ? "tel" : "text"} value={key === "name" ? value : key === "date" ? birthDate : key === "city" ? city : phone} onChange={e => {const next=e.target.value;if(key === "name")setValue(next);else if(key === "date")setBirthDate(next);else if(key === "city")setCity(next);else setPhone(next);}} onInvalid={e => e.currentTarget.closest("details")?.setAttribute("open", "")} required={key !== "phone"} maxLength={key === "name" || key === "city" ? 100 : key === "phone" ? 30 : undefined} /></div></details>)}<div className="rounded-madevi-pill border border-madevi-line px-madevi-15 py-madevi-13 text-madevi-muted">Username {username && `· @${username}`} · {t("tidak dapat diubah", "cannot be changed")}</div></div><button className={`${primaryButton} w-full`}>{t("Simpan perubahan", "Save changes")}</button></form><SocialProfileSettings english={english} /><EmailChange currentEmail={email} english={english} onUpdated={refetch} /><button type="button" className={`${outlineButton} w-full`} onClick={onReset}>{t("Atur ulang kata sandi dengan email", "Reset password by email")}</button>{message && <p role="status">{message}</p>}</>;
+      finally {setSaving(false);}
+    }}><fieldset disabled={!loaded || saving} className={`m-0 min-w-0 border-0 p-0 ${formLayout}`}><h3>{t("Pengaturan akun", "Account settings")}</h3><div className="flex flex-col gap-madevi-8">{([[t("Nama lengkap", "Full name"), "name"], [t("Tanggal lahir", "Date of birth"), "date"], [t("Kota asal", "City of origin"), "city"], [t("Nomor telepon (opsional)", "Phone (optional)"), "phone"]] as const).map(([label, key]) => <details key={key} className="rounded-madevi-20 border border-madevi-line bg-madevi-surface"><summary className="flex cursor-pointer list-none items-center justify-between gap-madevi-12 px-madevi-15 py-madevi-13 font-bold">{label}<ChevronRight size={17} /></summary><div className="px-madevi-15 pb-madevi-13"><Field label={label} type={key === "date" ? "date" : key === "phone" ? "tel" : "text"} value={key === "name" ? value : key === "date" ? birthDate : key === "city" ? city : phone} onChange={e => {const next=e.target.value;if(key === "name")setValue(next);else if(key === "date")setBirthDate(next);else if(key === "city")setCity(next);else setPhone(next);}} onInvalid={e => e.currentTarget.closest("details")?.setAttribute("open", "")} required={key !== "phone"} maxLength={key === "name" || key === "city" ? 100 : key === "phone" ? 30 : undefined} /></div></details>)}<div className="rounded-madevi-pill border border-madevi-line px-madevi-15 py-madevi-13 text-madevi-muted">Username {username && `· @${username}`} · {t("tidak dapat diubah", "cannot be changed")}</div></div><button className={`${primaryButton} w-full`}>{t("Simpan perubahan", "Save changes")}</button></fieldset></form>{!loaded && <button type="button" className={outlineButton} onClick={() => setRetry(n => n + 1)}>{t("Muat ulang profil", "Reload profile")}</button>}<SocialProfileSettings english={english} /><EmailChange currentEmail={email} english={english} onUpdated={refetch} /><button type="button" className={`${outlineButton} w-full`} onClick={onReset}>{t("Atur ulang kata sandi dengan email", "Reset password by email")}</button>{message && <p role="status">{message}</p>}</>;
 }
 function PasswordRecovery({
   email,
