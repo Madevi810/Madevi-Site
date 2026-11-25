@@ -6,7 +6,7 @@ import { PhotoEditor } from "./photo-editor";
 import { authClient } from "@/lib/auth-client";
 import { Field } from "./ui";
 import { SocialProfileSettings } from "./social-profile-settings";
-import { profilePane, pillTabs, pillButton, pillActive, pillInactive, profileContent, profileLinks, logout, fineText, primaryButton, outlineButton, avatar, formLayout, fieldLabel, inputControl, statusMessage, textButton } from "./styles";
+import { profilePane, pillTabs, pillButton, pillActive, pillInactive, profileContent, logout, fineText, primaryButton, outlineButton, formLayout, statusMessage, textButton } from "./styles";
 type View = "signin" | "signup" | "forgot" | "reset";
 const PENDING_PHOTO = "madevi-pending-profile-photo";
 export function Profile({

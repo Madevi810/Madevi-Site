@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
-import { Activity, Bell, Database, FileText, LayoutDashboard, Menu, Search, Settings, ShieldCheck, UserRound, Users, X, LogOut, ArrowUpRight } from "lucide-react";
+import { Activity, Bell, Database, FileText, LayoutDashboard, Menu, Search, Settings, UserRound, Users, X, LogOut, ArrowUpRight } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useFocusTrap } from "./ui";
 import { AdminContent } from "./admin-content";

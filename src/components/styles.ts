@@ -42,7 +42,6 @@ export const pillButton = "rounded-madevi-pill border-0 px-madevi-23 py-madevi-9
 export const pillActive = "bg-madevi-surface text-madevi-text shadow-madevi-tab";
 export const pillInactive = "bg-transparent text-madevi-muted";
 export const profileContent = "min-h-0 flex-1 overflow-auto px-madevi-1 py-madevi-18";
-export const profileLinks = "[&>div]:flex [&>div]:justify-between [&>div]:border-b [&>div]:border-madevi-line [&>div]:py-madevi-16";
 export const logout = "mt-auto flex w-full items-center justify-center gap-madevi-8 rounded-madevi-pill border border-madevi-line bg-madevi-surface p-madevi-13";
 export const fineText = "m-0 text-madevi-11 leading-normal text-madevi-muted";
 export const primaryButton = "inline-flex min-h-madevi-43 items-center justify-center gap-madevi-8 rounded-madevi-pill border border-madevi-text bg-madevi-text px-madevi-20 font-bold text-madevi-surface";

@@ -16,3 +16,8 @@ database/backups/*
 # Keluaran dan metadata sementara audit tampilan.
 out/
 audit-preview/.openai/
+
+# Deklarasi yang dibuat Next.js dan keluaran Playwright lokal.
+next-env.d.ts
+playwright-report/
+test-results/

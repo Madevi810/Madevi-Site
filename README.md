@@ -1,97 +1,90 @@
-# MADEVI — project website v0.0.0.17
+# Madevi
 
-Website pendidikan dan jasa digital dengan tujuh ruang. Ini adalah **implementasi awal untuk pengujian**, belum dinyatakan siap untuk produksi atau data pengguna nyata. Tujuh ruang dan taksonominya sengaja belum diisi.
+Madevi adalah platform web edukasi dan layanan digital. Pengunjung dapat menemukan materi pengetahuan dan panduan praktik melalui satu situs. Semua ruang memakai fondasi navigasi, akun, pencarian, dan pengelolaan konten yang sama.
 
-Notifikasi umum, sistem, dan sosial dimuat per kelompok dengan halaman lanjutan; notifikasi pribadi memerlukan sesi yang berhak. Navigasi keyboard dan umpan balik form ditingkatkan.
+| Ruang | Tujuan |
+| --- | --- |
+| Explore & Learn | Artikel pengetahuan mendalam dengan contoh, ilustrasi, materi teks dan video, serta rujukan. |
+| Tutorial & Problem Solve | Panduan praktik bertahap dan solusi untuk masalah sehari-hari. |
+| Madevi School | Jalur pendidikan terstruktur, materi, tugas, ujian, dan evaluasi. |
+| Madevi Shop | Katalog afiliasi yang mengarahkan pembelian ke toko mitra. |
+| Tools & Equipment | Kalkulator, konverter, simulator, dan alat bantu interaktif. |
+| Madevi Services | Informasi, simulasi, dan pemesanan jasa digital. |
+| Madevi Line | Ruang kreativitas dan berbagi cerita dengan fitur komunitas dan moderasi. |
 
-## Persiapan
+Explore & Learn dan Tutorial & Problem Solve menjadi prioritas pengembangan konten. Saat ini ketujuh halaman ruang tersedia sebagai kerangka dan taksonomi serta konten asli belum diisi. Alur bersama mencakup pencarian judul, halaman baca teks terbit, pengelolaan draf dan publikasi, profil dan avatar, notifikasi umum dan sistem, pelaporan, serta panel admin dengan MFA.
 
-Diperlukan Node.js 24 LTS atau versi LTS yang kompatibel, npm, dan PostgreSQL yang dapat diakses. Siapkan database khusus untuk pengujian, terpisah dari produksi. Jangan menjalankan akun demo di sistem dengan data nyata.
+Pendaftaran, verifikasi, perubahan email, dan pemulihan kata sandi memerlukan SMTP. Google OAuth memiliki konfigurasi opsional dan masih memerlukan uji penyedia. Halaman kebijakan, bantuan, fitur simpan, dan ikon sosial developer masih berupa penanda. Modul khusus lima ruang lainnya masih direncanakan. Status proyek adalah **pengembangan lokal, belum siap menerima pengguna nyata**.
 
-1. Jalankan `npm ci` di direktori ini.
-2. Salin `.env.example` ke `.env.local`, isi `DATABASE_URL`, `BETTER_AUTH_URL`, dan `BETTER_AUTH_SECRET` acak minimal 32 karakter. Simpan file tersebut secara pribadi. Nilai default pada contoh bukan kredensial aktif.
-3. Jalankan `npm run db:migrate`.
-4. Untuk dua akun demo **hanya di lingkungan development yang tidak dibuka publik**, atur `MADEVI_ENV=dev`, `MADEVI_DEMO_MODE=true`, dan `DEMO_PASSWORD` melalui `.env.local`, lalu jalankan `npm run db:seed-demo`. Username: `Madevi-Admin` dan `Madevi-User`. Password tidak disertakan dalam kode atau arsip. Akun demo menggunakan verifikasi yang telah ditandai selesai dan tidak memerlukan MFA. Batasi siapa yang dapat mengakses lingkungan uji.
-5. Jalankan `npm run dev`, kemudian buka alamat yang ditampilkan terminal. Demo dinonaktifkan dalam `NODE_ENV=production`; akun demo tetap ditolak meskipun ada di database. Jangan memasukkan atau memindahkan akun demo ke produksi.
+## Cuplikan aplikasi lokal
 
-## Akun biasa dan admin non-demo
+Cuplikan diambil dari build pengembangan lokal Madevi V0.0.0.18. Profil dan admin memakai akun demo sintetis. [Cara mengambil ulang galeri](docs/screenshot.md)
 
-- Pendaftaran pengguna biasa membutuhkan SMTP: isi semua `SMTP_*` dan `MAIL_FROM`. Tanpa konfigurasi tersebut pendaftaran ditolak, agar akun tidak tampak terverifikasi padahal email tidak dikirim.
-- Google OAuth menggunakan `GOOGLE_CLIENT_ID` dan `GOOGLE_CLIENT_SECRET`; daftarkan URL callback `/api/auth/callback/google` pada penyedia dan konfigurasi asal yang sesuai. Alur ini belum diuji dengan akun Google sungguhan. Setelah masuk, pengguna yang belum memiliki username diminta melengkapi username dan tanggal lahir.
-- Nomor telepon dapat disimpan pada pendaftaran, tetapi **login melalui nomor telepon belum tersedia**. Verifikasi kepemilikan nomor dan layanan pendukung harus dirancang sebelum diaktifkan.
-- Untuk membuat admin non-demo pertama, isi `OWNER_USERNAME`, `OWNER_EMAIL`, dan `OWNER_PASSWORD` secara aman, lalu jalankan `npm run db:create-owner`. Skrip menolak jika sudah ada admin. Hapus nilai password dari file konfigurasi setelah digunakan. Saat pertama masuk `/admin`, aktifkan autentikator, catat kode pemulihan, dan verifikasi kode. Dashboard dan API admin menolak akun admin non-demo yang belum mengaktifkan autentikator. Tinjau dan uji seluruh jalur pemulihan serta konfigurasi sebelum penggunaan nyata.
-- `BETTER_AUTH_URL` harus URL HTTPS untuk `MADEVI_ENV=production`. Pastikan reverse proxy, TLS, cookies, batas request dan asal permintaan dikonfigurasi serta diuji sesuai deployment.
+<table>
+  <tr>
+    <td><a href="docs/screenshots/beranda-desktop.png"><img src="docs/screenshots/beranda-desktop.png" alt="Beranda Madevi di desktop, dengan hero dan daftar ruang" width="540"></a></td>
+    <td><a href="docs/screenshots/beranda-ponsel.png"><img src="docs/screenshots/beranda-ponsel.png" alt="Beranda Madevi pada ponsel, dengan header dan hero" width="205"></a></td>
+  </tr>
+  <tr>
+    <td>Beranda desktop</td>
+    <td>Beranda ponsel</td>
+  </tr>
+</table>
 
-## Status fungsi
+<table>
+  <tr>
+    <td><a href="docs/screenshots/sidebar.png"><img src="docs/screenshots/sidebar.png" alt="Sidebar Madevi terbuka dengan navigasi tujuh ruang" width="270"></a></td>
+    <td><a href="docs/screenshots/profil.png"><img src="docs/screenshots/profil.png" alt="Tab Status pada profil pengguna demo Madevi" width="270"></a></td>
+    <td><a href="docs/screenshots/admin.png"><img src="docs/screenshots/admin.png" alt="Dashboard admin demo Madevi dengan kartu pengelolaan" width="270"></a></td>
+  </tr>
+  <tr>
+    <td>Sidebar</td>
+    <td>Profil pengguna</td>
+    <td>Dashboard admin</td>
+  </tr>
+</table>
 
-- Tersedia: halaman beranda dan ruang kosong; pencarian judul untuk konten terbit; sidebar; tema; sebagian terjemahan; login/daftar dengan verifikasi email ketika SMTP dikonfigurasi; sesi; perubahan nama; unggah foto profil JPG/PNG/WebP hingga 1 MB, diproses ulang dan disimpan privat di database; laporan masalah; admin dengan daftar, blokir/pulihkan pengguna dan laporan; audit aksi blokir; autentikator dan kode pemulihan admin.
-- Panel admin memiliki pengelolaan draf dan penerbitan teks dasar dengan halaman hasil; daftar akun dan laporan juga menggunakan halaman hasil. Ini belum menjadi pengelola seluruh fitur tujuh ruang. Google OAuth telah disiapkan secara kondisional, tetapi belum diuji dengan penyedia asli. Login nomor telepon, tautan akun sosial developer, notifikasi sosial, serta daftar simpan/belajar/katalog/riwayat belum terhubung. Notifikasi umum dan sistem sudah memakai database dan diuji lokal; belum diuji dengan layanan nyata. Panel dan data School, Shop, Tools, Services, dan Line belum dibangun.
-- Pengaturan bahasa belum mencakup semua teks admin; navigasi admin dan aksesibilitas memerlukan pengujian perangkat lebih luas. Pembatasan permintaan memakai bucket bersama secara bawaan; header IP hanya dipakai setelah proxy tepercaya dikonfigurasi seperti dijelaskan di bawah.
-- Belum ada layanan monitoring, layanan penyimpanan media skala besar, backup terjadwal, provider hosting, audit keamanan independen, atau pengujian kapasitas produksi. Pendaftaran dan OAuth memerlukan provider yang belum disiapkan. Jangan menyatakan aplikasi siap produksi.
+## Stack dan struktur
 
-## Pengujian
+Aplikasi memakai Node.js 24, Next.js App Router, React, TypeScript, PostgreSQL melalui `pg`, dan Better Auth. Tailwind CSS/PostCSS dan token CSS mengatur tampilan. Zod memvalidasi input, Sharp memproses gambar, dan Nodemailer mengirim email.
 
-Ringkasan verifikasi lokal terbaru dan batasannya: [ops/verification-v17.md](ops/verification-v17.md).
+| Lokasi | Isi |
+| --- | --- |
+| [src/app](src/app), [src/proxy.ts](src/proxy.ts) | Halaman publik/admin, Route Handlers dan pengaman request. |
+| [src/components](src/components), [src/lib](src/lib) | Komponen React, autentikasi, izin, data, validasi dan logika bersama. |
+| [public](public) | Gambar dan font publik, termasuk [lisensi font Noto Sans](public/fonts/OFL-Noto-Sans.txt). |
+| [scripts](scripts), [database](database) | Migrasi SQL, bootstrap akun, backup, dan rujukan database. |
+| [tests](tests), [CI](.github/workflows/ci.yml) | Tes unit, integrasi lokal melalui skrip, dan konfigurasi GitHub Actions. |
+| [docs](docs), [ops](ops) | Panduan proyek dan prosedur operasional. |
 
-`npm test` menguji aturan isolasi demo dan konfigurasi email. `npm run typecheck` memeriksa TypeScript. `npm run test:integration` membuat database PostgreSQL **PGlite sementara di memori** dan server SMTP lokal palsu untuk pengujian; tes ini tidak menggantikan uji PostgreSQL server sungguhan, SMTP asli, atau Google OAuth. Ia menguji migrasi, dua akun demo, verifikasi email uji, kontrol akses admin, pemblokiran/pemulihan, sesi, nama pengguna tetap, foto, laporan dan MFA. Tes menggunakan port lokal 25433, 25434, 3000 dan data sementara.
+## Jalankan secara lokal
 
-`npm run build` membangun aplikasi; konfigurasi database dan rahasia tetap diperlukan saat membangun dan menjalankan. Karena build memakai `NODE_ENV=production`, wajib mengatur `MADEVI_ENV=staging` atau `production` dan `BETTER_AUTH_URL` HTTPS; jangan menggunakan mode demo. Konfigurasi development lokal `MADEVI_ENV=dev` hanya untuk menjalankan `npm run dev`. Untuk pemeriksaan visual otomatis opsional, pasang browser Playwright yang sesuai lalu gunakan `MADEVI_VISUAL_CHECK=1 npm run test:integration`.
+1. Siapkan Node.js 24, npm, dan database PostgreSQL terpisah untuk development. Jalankan `npm ci` dari root repo.
+2. Jika `.env.local` belum ada, jalankan `cp .env.example .env.local`. Isi `DATABASE_URL` dari PostgreSQL lokal, `BETTER_AUTH_URL=http://127.0.0.1:3000` dan `BETTER_AUTH_SECRET` dengan nilai acak minimal 32 karakter. Jaga `.env.local` tetap privat.
+3. Jalankan `npm run db:migrate` lalu `npm run dev`. Buka `http://127.0.0.1:3000`.
+4. Untuk menguji login tanpa SMTP, gunakan [akun demo lokal terisolasi](ops/demo-terbatas.md). Untuk admin non-demo, ikuti [langkah bootstrap dan MFA](docs/online.md#5-buat-admin-dan-uji-alur).
 
-Untuk backup manual, pasang `pg_dump` yang cocok dan jalankan `npm run db:backup -- /lokasi-aman/madevi.dump`. Backup harus dilindungi dan diuji dengan pemulihan ke database **uji terpisah**. Otomasi backup, enkripsi, retensi dan uji pemulihan backup logis belum disiapkan. Pemulihan salinan fisik lokal sudah diuji.
+| Perintah | Kegunaan |
+| --- | --- |
+| `npm run typecheck` dan `npm test` | Hasilkan tipe route Next.js, periksa TypeScript, dan jalankan tes unit. |
+| `npm run test:integration` | Uji aplikasi lokal dengan PGlite dan SMTP palsu. Sisakan port loopback 3000, 25433, dan 25434. |
+| `MADEVI_TEST_BUILD=1 npm run test:integration` | Jalankan build dalam konfigurasi uji staging, lalu uji aplikasi. |
+| `npm run build` dan `npm start` | Build dan start Node.js dengan konfigurasi staging/produksi yang valid. |
 
-## Keamanan dan lisensi
+Untuk langkah lengkap dan solusi masalah setup, lihat [panduan lokal](docs/lokal.md). Mulai dari [indeks dokumentasi](docs/README.md), lalu baca [fondasi proyek](docs/fundamental.md), [persiapan online](docs/online.md) atau [laporan verifikasi penataan](docs/laporan-penataan.md).
 
-Perangkat lunak dan dependensi perlu ditinjau serta diperbarui sebelum penggunaan nyata. Jangan memasukkan rahasia ke repositori, log, tangkapan layar, atau arsip. Kode ini belum diaudit independen. Noto Sans disertakan dengan lisensi SIL OFL di `public/fonts/OFL-Noto-Sans.txt`; lisensi dependensi tercatat pada paket masing-masing.
+## Madevi V0.0.0.18 — Update terbaru
 
+Pembaruan ini merapikan fondasi proyek, menambahkan galeri screenshot dari aplikasi lokal, dan melengkapi panduan setup, persiapan online, serta perpindahan layanan.
 
-## Pembaruan sistem v0.0.0.2
+Pembaruan utama (major) berikut dipilih berdasarkan dampaknya pada fondasi dan alur pengguna. Kategori ini untuk penyajian riwayat. Nomor versi Madevi tetap memakai empat bagian dan angka terakhir bertambah satu tiap rilis.
 
-Pondasi generik disiapkan dalam keadaan kosong: dokumen memiliki ruang, tipe, slug unik, metadata, relasi, riwayat revisi, dan alur `draft → in_review → approved → published` serta arsip. Revisi yang sudah terbit tetap terlihat sampai revisi baru diterbitkan. API publik hanya membaca versi terbit; operasi admin dibatasi izin, input divalidasi, daftar mempunyai pagination, filter, dan pengurutan yang dibatasi. Hak `author`, `reviewer`, dan `moderator` tersedia sebagai kerangka, tetapi tidak ada staf tambahan yang dibuat; Ade tetap satu-satunya admin. Tabel akun dan data aplikasi menggunakan satu pool dalam proses aplikasi.
+- **V0.0.0.18** — Penataan fondasi, galeri aplikasi, dan panduan operasional.
+- **V0.0.0.17** — Penguatan alur profil dan bukti pengujian lokal.
+- **V0.0.0.13** — Tata letak Default untuk beranda, sidebar, profil, dan dashboard admin.
+- **V0.0.0.8** — Profil, pelaporan, dan kerangka notifikasi berbasis PostgreSQL.
+- **V0.0.0.3** — Pemisahan aplikasi dari Pondasi serta konfigurasi awal server.
+- **V0.0.0.2** — Fondasi konten dengan revisi, alur penerbitan, dan kontrol izin.
+- **V0.0.0.1** — Kerangka awal tujuh ruang, akun, dan admin.
 
-Media memakai kontrak penyimpanan; implementasi saat ini tetap PostgreSQL dengan varian avatar WebP 64/256/512 dan dukungan avatar lama. Pencarian memakai adaptor PostgreSQL; cache bawaan tidak menyimpan data. Belum ada object storage, CDN, cache bersama atau pencarian eksternal aktif. Mengganti penyedia masih memerlukan adaptor dan pengujian.
-
-Validasi lingkungan, CSP nonce, HSTS untuk produksi, rate limit bersama PostgreSQL, log keamanan terstruktur, health live/ready dan contoh CI/container telah ditambahkan. Jangan mengaktifkan `TRUST_PROXY_HEADERS` kecuali reverse proxy yang terpercaya menghapus header dari klien dan mengisi `X-Real-IP`; secara bawaan semua permintaan tanpa identitas proxy memakai satu bucket bersama. Lihat `ops/environments.md` dan `ops/operations.md`. Rate limit di database adalah perlindungan awal, bukan mitigasi DDoS skala besar. Pengumpulan log, monitoring dan alert pihak ketiga belum tersambung.
-
-Untuk uji lokal: `npm run typecheck`, `npm test`, dan `npm run test:integration`. Pengujian integrasi memakai database sementara PGlite; dengan `MADEVI_TEST_DATABASE_URL` dapat memakai PostgreSQL lokal dengan nama database `madevi_ci_*` yang terisolasi. `scripts/test-real-postgres.mjs` dapat menguji PostgreSQL lokal terisolasi dan pemulihan salinan fisik saat server berhenti, dengan `MADEVI_POSTGRES_BIN_DIR` menunjuk binari `initdb` dan `pg_ctl`. Skrip tersebut membuat dan menghapus cluster sementara miliknya sendiri. Build dan runtime Docker lokal telah diuji; CI terakhir yang terverifikasi pada riwayat proyek adalah v0.0.0.16, status CI v0.0.0.17 perlu diperiksa di GitHub Actions. Backup otomatis dan restore dengan `pg_dump`/`pg_restore` masih memerlukan uji pada lingkungan tujuan. Detail hasil dan batas pengujian disimpan bersama dokumen Pondasi yang terpisah.
-
-
-## Penyiapan server v0.0.0.3
-
-Folder ini dapat menjadi akar repository Git dan berdiri sendiri dari dokumen Pondasi. `compose.yml` dan `ops/reverse-proxy.example.md` adalah contoh untuk disesuaikan setelah provider, database dan domain tersedia; Docker lokal telah diuji seperti dicatat pada laporan verifikasi; server tujuan belum diuji. Database dan kredensial tidak disertakan. Ikuti `ops/deploy-checklist.md` sebelum menerima data nyata. Folder `database/` menjelaskan migrasi tanpa menyalin berkasnya.
-
-Tailwind dan PostCSS telah dipasang sebagai dasar, tanpa preflight untuk menjaga tampilan saat ini. Token warna lama tetap dipakai. Migrasi sebagian besar class CSS ke utility Tailwind dan pemeriksaan semua layar belum selesai; jangan menganggap seluruh styling sudah dimigrasikan.
-
-
-## Status v0.0.0.11
-
-WARNING / belum siap pengguna nyata. Pengamanan mode runtime dan validasi data admin diperketat; daftar akun, laporan, serta konten mendukung halaman hasil dan notifikasi admin mengambil status nyata. Gaya komponen global dipindahkan ke utility, tetapi pemeriksaan visual masih belum lulus. Site online tidak diperbarui.
-
-## Riwayat v0.0.0.10
-
-WARNING / belum siap pengguna nyata. Cabang tampilan audit telah dipisahkan dari aplikasi; demo lokal terbatas tetap ada. Migrasi sebagian CSS dilakukan, namun audit visual dan Tailwind belum lengkap. Tidak ada perubahan pada site online.
-
-## Riwayat v0.0.0.9
-
-WARNING / belum siap pengguna nyata. Akun demo sementara dibatasi untuk development lokal; lihat `ops/demo-terbatas.md`. Kebutuhan layanan dicatat di `ops/kebutuhan-layanan.md`. Bahan site audit tidak ada dalam paket; sejumlah cabang audit lama dalam komponen masih perlu dipisahkan.
-
-## Riwayat v0.0.0.8
-
-Situs audit menggunakan data contoh di browser; database, SMTP dan backend nyata belum terhubung. Migrasi 002 menambah notifikasi, laporan dan preferensi sosial, serta perlu dijalankan bersama migrasi lain sebelum menjalankan backend baru. OTP dan pemisahan hak akses diuji lokal dengan data sintetis; SMTP/Google nyata, staging, CI, Docker, backup di lingkungan tujuan dan audit independen masih belum lulus. Halaman kebijakan belum final. Belum siap pengguna nyata.
-
-## Status historis v0.0.0.7
-
-Tautan audit privat menyediakan tampilan User dan Admin uji sementara tanpa akses server/database. Pendaftaran asli dirancang dua langkah dan masih memerlukan PostgreSQL serta email verifikasi nyata. Jangan memasukkan data sungguhan pada tautan audit. Bahan site audit dipisahkan dari paket aplikasi v0.0.0.9. Sistem belum siap produksi.
-
-## Status historis v0.0.0.6
-
-Tampilan audit memakai komponen source Madevi yang sama, tetapi akun, laporan, database, dan API belum terhubung. Bahan site audit dipisahkan dari paket aplikasi v0.0.0.9. Ini bukan staging aplikasi penuh dan bukan kesiapan produksi. Build dan deploy ulang diperlukan setiap perubahan source.
-
-## Status historis v0.0.0.5
-
-Migrasi gaya komponen ke Tailwind serta struktur rujukan database dan prosedur backup telah diselesaikan dalam lingkup lokal. Typecheck dan tujuh tes unit lulus; integrasi, build, browser Chromium dengan data sintetis dan aksesibilitas terbatas dicatat di `Pondasi/Foundation/12-Handover/Verification-Stage-4.md`. Folder Pondasi tidak menjadi dependensi aplikasi. CI GitHub, Docker, backup logis di tujuan, staging, audit, dan produksi belum terbukti. Database akan dibuat baru; penyedia layanan belum dipilih. Tidak siap pengguna nyata.
-
-## Status historis v0.0.0.4
-
-Pencarian dan halaman baca hanya menampilkan versi terbit; halaman baca saat ini mendukung blok paragraf teks sederhana, bukan semua format materi. Admin dapat mengelola draf teks sederhana; editor menolak format yang belum didukung agar data tidak terhapus. Seluruh ruang tetap tidak berisi data nyata.
-
-Migrasi Tailwind masih berlangsung; jangan menyatakan seluruh komponen sudah selesai. Pengaman rollback uji menolak jika ada data pada tabel Madevi atau auth yang dikenal, namun tetap hanya untuk development dan tidak boleh dipakai sebagai pemulihan produksi. Pemulihan password telah diuji dengan SMTP palsu, bukan penyedia nyata. CI, Docker, staging, dan kesiapan produksi belum teruji.
+[Rincian perubahan dan riwayat lengkap yang tercatat](CHANGELOG.md)

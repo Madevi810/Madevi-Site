@@ -1,14 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir } from "node:fs/promises";
 
-test("migration reference copies match the single executable source", async () => {
-  const source = "scripts/migrations";
-  const reference = "database/migrations";
-  const names = (await readdir(source)).filter((name) => name.endsWith(".sql")).sort();
-  const copies = (await readdir(reference)).filter((name) => name.endsWith(".sql")).sort();
-  assert.ok(names.length > 0);
-  assert.deepEqual(copies, names);
-  for (const name of names) assert.deepEqual(await readFile(join(reference, name)), await readFile(join(source, name)), name);
+test("migration SQL lives in one directory with up and down pairs", async () => {
+  const source = (await readdir("scripts/migrations")).filter((name) => name.endsWith(".sql"));
+  const reference = (await readdir("database/migrations")).filter((name) => name.endsWith(".sql"));
+  const up = source.filter((name) => name.endsWith(".up.sql"));
+  assert.ok(up.length > 0);
+  assert.deepEqual(reference, [], "reference directory must not duplicate executable SQL");
+  const pairs = up.flatMap((name) => [name, name.replace(/\.up\.sql$/, ".down.sql")]);
+  assert.deepEqual(source.sort(), pairs.sort());
 });

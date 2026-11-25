@@ -1,4 +1,6 @@
-# Catatan implementasi dan penyerahan
+# Catatan historis implementasi v0.0.0.17
+
+Gunakan [indeks dokumentasi](docs/README.md) untuk kondisi proyek dan panduan terkini. Catatan di bawah merekam bukti pada saat penyerahan v17.
 
 Status: WARNING. Aplikasi masih dalam pematangan dan belum siap untuk pengguna nyata.
 

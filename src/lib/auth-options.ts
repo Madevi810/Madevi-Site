@@ -1,13 +1,12 @@
 import { twoFactor, username, emailOTP } from "better-auth/plugins";
 import { pool } from "./db.ts";
 import nodemailer from "nodemailer";
-import { isDemoAllowed } from "./config.ts";
+import { emailConfigured, isDemoAllowed } from "./config.ts";
 import { validateEnvironment } from "./env.ts";
 
 validateEnvironment();
-const mailReady = () => Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.MAIL_FROM);
 async function sendMail(to: string, url: string, subject: string) {
-  if (!mailReady()) throw new Error("Pengiriman email belum dikonfigurasi");
+  if (!emailConfigured()) throw new Error("Pengiriman email belum dikonfigurasi");
   const smtp = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT), secure: Number(process.env.SMTP_PORT) === 465, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
   await smtp.sendMail({ from: process.env.MAIL_FROM, to, subject, text: `${subject}\n\n${url}` });
 }
