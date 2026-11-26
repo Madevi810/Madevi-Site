@@ -19,7 +19,7 @@ Rollback migrasi `npm run db:rollback:test` hanya di development, memerlukan `AL
 
 ## Monitoring dan alert
 
-`/api/health/live` menunjukkan proses melayani HTTP. `/api/health/ready` memeriksa koneksi dan catatan migrasi `002_notifications`. Verifikasi SMTP, Google, backup dan integritas data mengikuti pemeriksaan terpisah di [panduan online](../docs/online.md). Logging JSON untuk respons login/MFA, rate limit dan aksi akun tidak memuat password, token, isi pesan, atau alamat email. Tabel audit menyimpan perubahan peran dan aksi penting; akses dan retensi harus dibatasi.
+`/api/health/live` menunjukkan proses melayani HTTP. `/api/health/ready` memeriksa koneksi, versi migrasi, indeks admin tunggal dan kolom bukti MFA. Verifikasi SMTP, Google, backup dan integritas data mengikuti pemeriksaan terpisah di [panduan online](../docs/online.md). Logging JSON untuk respons login/MFA, rate limit dan aksi akun tidak memuat password, token, isi pesan, atau alamat email. Tabel audit menyimpan perubahan peran dan aksi penting; akses dan retensi harus dibatasi.
 
 Usulan alert setelah memilih layanan: readiness gagal, error 5xx meningkat, p95 melambat, database/storage hampir penuh, backup gagal dan restore gagal. Tentukan penerima dan eskalasi; tidak ada collector, alert, scheduler, atau pemantauan 24 jam yang aktif sekarang.
 

@@ -18,6 +18,7 @@ jobs:
           POSTGRES_DB: madevi_ci_test
         ports: ["25435:5432"]
         options: >-
+          --label madevi.scope=synthetic-ci
           --health-cmd "pg_isready -U madevi_test -d madevi_ci_test"
           --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
@@ -29,11 +30,17 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck && npm test
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:integration
         env:
           MADEVI_TEST_DATABASE_URL: postgresql://madevi_test:local-test-only@127.0.0.1:25435/madevi_ci_test
           MADEVI_TEST_BUILD: "1"
           MADEVI_TEST_LOAD: "1"
+          MADEVI_VISUAL_CHECK: "1"
+      - name: Validate isolated migration and runtime roles
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: bash scripts/test-db-roles.sh
       - name: Backup and restore isolated CI database
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
@@ -41,5 +48,9 @@ jobs:
           docker exec "$PG_CONTAINER" pg_dump -U madevi_test -Fc -f /tmp/madevi-ci.dump madevi_ci_test
           docker exec "$PG_CONTAINER" createdb -U madevi_test madevi_ci_restore
           docker exec "$PG_CONTAINER" pg_restore -U madevi_test --exit-on-error -d madevi_ci_restore /tmp/madevi-ci.dump
-          test "$(docker exec "$PG_CONTAINER" psql -U madevi_test -d madevi_ci_restore -tAc "SELECT count(*) FROM madevi_schema_migrations WHERE version='001_foundation'")" = "1"
+          query="SELECT version, checksum FROM madevi_schema_migrations ORDER BY version"
+          source=$(docker exec "$PG_CONTAINER" psql -U madevi_test -d madevi_ci_test -tAc "$query")
+          restored=$(docker exec "$PG_CONTAINER" psql -U madevi_test -d madevi_ci_restore -tAc "$query")
+          test -n "$source"
+          test "$source" = "$restored"
       - run: npm audit --omit=dev --audit-level=high

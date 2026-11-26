@@ -37,10 +37,11 @@ TRUST_PROXY_HEADERS=false
 
 Ganti placeholder secret dengan keluaran `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` dari terminal privat. Secret dipakai oleh autentikasi dan perlindungan request. Jika menggunakan PostgreSQL sendiri, ganti komponen URI sesuai akses lokal. URI adalah alamat koneksi lengkap. Enkode karakter khusus pada nama/password jika menyusun URI sendiri. Simpan file tetap privat dan jaga agar tidak ikut commit atau tangkapan layar. Biarkan SMTP dan Google kosong untuk percobaan lokal biasa.
 
-Jalankan migrasi untuk membuat tabel dasar. Setelah tertulis `Migrasi selesai.`, jalankan server pengembangan:
+Jalankan migrasi untuk membuat tabel dasar. Setelah tertulis `Migrasi selesai.`, periksa konfigurasi dan jalankan server pengembangan:
 
 ```bash
 npm run db:migrate
+npm run check:ready
 npm run dev
 ```
 

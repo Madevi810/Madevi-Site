@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isDemoAllowed, emailConfigured } from "../src/lib/config.ts";
+import { isDemoAllowed } from "../src/lib/config.ts";
+import { smtpSettings } from "../src/lib/env.ts";
 
 test("demo access requires explicit development environment and flag", () => {
   const local = { MADEVI_ENV: "dev", MADEVI_DEMO_MODE: "true", NODE_ENV: "development", DATABASE_URL: "postgresql://localhost/madevi_test", BETTER_AUTH_URL: "http://localhost:3000" };
@@ -16,7 +17,7 @@ test("demo access requires explicit development environment and flag", () => {
   assert.equal(isDemoAllowed({...local, DATABASE_URL: "postgresql://[::1]/db", BETTER_AUTH_URL: "http://[::1]:3000"}), true);
 });
 test("registration email requires complete configuration", () => {
-  assert.equal(emailConfigured({}), false);
-  assert.equal(emailConfigured({ SMTP_HOST: "host", SMTP_PORT: "587", SMTP_USER: "user", SMTP_PASS: "pass" }), false);
-  assert.equal(emailConfigured({ SMTP_HOST: "host", SMTP_PORT: "587", SMTP_USER: "user", SMTP_PASS: "pass", MAIL_FROM: "test@example.invalid" }), true);
+  assert.equal(smtpSettings({}), null);
+  assert.throws(() => smtpSettings({ SMTP_HOST: "host", SMTP_PORT: "587", SMTP_USER: "user", SMTP_PASS: "pass" }), /SMTP harus lengkap/);
+  assert.equal(smtpSettings({ SMTP_HOST: "host", SMTP_PORT: "587", SMTP_USER: "user", SMTP_PASS: "pass", MAIL_FROM: "test@example.invalid" })?.port, 587);
 });

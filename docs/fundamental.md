@@ -2,6 +2,8 @@
 
 ## Identitas dan pengguna
 
+Pemilik mengendalikan proyek dan layanan. Satu admin utama mengendalikan fungsi pengelolaan di aplikasi. Akun website tetap mengikuti pendaftaran umum saat layanan email siap.
+
 Madevi menggabungkan pengetahuan, panduan praktik dan layanan digital agar pengunjung dapat belajar dan mencari bantuan melalui satu situs. Prioritas berikutnya adalah Explore & Learn dan Tutorial & Problem Solve. Halaman dan navigasi ketujuh ruang sudah tersedia. Ruang masih kosong dan menggunakan nama serta slug tetap dari [src/lib/rooms.ts](../src/lib/rooms.ts).
 
 | Ruang / slug | Tujuan dan batas pengembangan |
@@ -18,7 +20,7 @@ Madevi menggabungkan pengetahuan, panduan praktik dan layanan digital agar pengu
 | --- | --- |
 | Pengunjung | Beranda, navigasi, halaman info, konten terbit, pencarian dan notifikasi umum. |
 | Akun biasa | Satu akun lintas ruang. Profil, foto sendiri, pengaturan privasi, notifikasi yang ditujukan kepadanya, dan laporan masalah. Akun diblokir kehilangan akses yang mensyaratkan sesi. |
-| Admin | Pemilik awal dibuat dengan skrip. Dapat mengelola pengguna, laporan, notifikasi dan konten. MFA wajib untuk akses admin non-demo. |
+| Admin | Pemilik awal dibuat dengan skrip. Dapat mengelola pengguna, laporan, notifikasi dan konten. MFA pada sesi yang digunakan wajib untuk akses admin non-demo. |
 | `author`, `reviewer`, `moderator` | Matriks izin membatasi penulisan, tinjauan/penerbitan, dan moderasi. Pengelolaan staf tambahan belum dioperasikan. |
 
 Matriks izin dan pemeriksaan sesi/peran/MFA dijalankan di server. Demo adalah pengecualian khusus development lokal untuk akun sintetis. [Izin](../src/lib/permissions.ts), [akses](../src/lib/access.ts), [demo](../ops/demo-terbatas.md)
@@ -51,9 +53,9 @@ Aplikasi memakai satu runtime Node.js agar halaman React, autentikasi dan API da
 
 ## Data, konten, dan media
 
-- Runner menyiapkan skema Better Auth dan tabel dasar audit, laporan, serta avatar. SQL `001_foundation` menambah konten, revisi, relasi, peristiwa moderasi, rate limit, log keamanan dan varian media. SQL `002_notifications` menambah notifikasi/status baca dan preferensi sosial, serta memperluas laporan dan sampah konten. SQL yang sudah diterapkan dilindungi checksum. Tambahkan migrasi baru untuk perubahan berikutnya. [Runner](../scripts/migrate.mjs), [SQL](../scripts/migrations), [panduan database](../database/README.md)
+- Runner menyiapkan skema Better Auth dan tabel dasar audit, laporan, serta avatar. SQL `001_foundation` menambah konten, revisi, relasi, peristiwa moderasi, rate limit, log keamanan dan varian media. SQL `002_notifications` menambah notifikasi/status baca dan preferensi sosial, serta memperluas laporan dan sampah konten. SQL `003_activation_security` menambah indeks identitas Google. Better Auth menambahkan kolom MFA sesi saat migrasi library. SQL yang sudah diterapkan dilindungi checksum. Tambahkan migrasi baru untuk perubahan berikutnya. [Runner](../scripts/migrate.mjs), [SQL](../scripts/migrations), [panduan database](../database/README.md)
 - Dokumen memiliki ruang, tipe, slug unik per ruang, metadata dan riwayat revisi. Status mencakup `draft → in_review → approved → published` serta arsip. Versi terbit tetap tersedia saat revisi baru diproses. API publik membaca konten terbit yang masih tersedia. Editor admin dan halaman baca mendukung paragraf teks dasar. Taksonomi, kategori, rujukan, media artikel, video dan pengelolaan hak aset perlu dirancang bersama alur editorial. [Logika konten](../src/lib/content.ts), [editor](../src/components/admin-content.tsx), [API publik](../src/app/api/content)
-- Avatar JPEG/PNG/WebP sampai 1 MB diproses ulang menjadi varian WebP 64/256/512 dan disimpan privat di PostgreSQL, dengan jalur data avatar lama. Foto bukti laporan juga berada di database dengan akses admin. Backup database mencakup media tersebut. Object storage, CDN dan pemrosesan video masuk tahap berikutnya saat kebutuhan terbukti. [Media](../src/lib/media.ts), [avatar](../src/app/api/account/avatar/route.ts), [akses bukti laporan](../src/app/api/admin/reports)
+- Avatar JPEG/PNG/WebP sampai 1 MB diproses ulang menjadi varian WebP 64/256/512 dan disimpan privat di PostgreSQL, Variannya menjadi sumber aktif untuk unggahan baru. Avatar lama masih dibaca sampai pengguna mengganti atau menghapusnya. Foto bukti laporan juga berada di database dengan akses admin. Backup database mencakup media tersebut. Object storage, CDN dan pemrosesan video masuk tahap berikutnya saat kebutuhan terbukti. [Media](../src/lib/media.ts), [avatar](../src/app/api/account/avatar/route.ts), [akses bukti laporan](../src/app/api/admin/reports)
 
 ## Integrasi, keamanan dan kualitas
 
@@ -65,7 +67,7 @@ Aplikasi memakai satu runtime Node.js agar halaman React, autentikasi dan API da
 
 - Development memakai loopback dan database uji. Staging memakai origin HTTPS, database/rahasia tersendiri dan data sintetis. Produksi memerlukan HTTPS, akun non-demo, kontrol jaringan dan operasi yang teruji. Dockerfile menyediakan runtime Node 24 non-root dan konfigurasi build terpisah dari secret runtime. Compose adalah contoh satu server dengan database eksternal. [Lingkungan](../ops/environments.md), [Dockerfile](../Dockerfile), [panduan online](online.md)
 - Pencarian judul memakai full-text PostgreSQL. Paginasi membatasi hasil admin dan notifikasi. Pool membatasi waktu koneksi 5 detik dan query 10 detik. Adaptor cache yang tersedia bersifat no-op pada runtime. Ukur puncak trafik, jumlah koneksi per proses, pertumbuhan media dan laju query sebelum menambah replika, cache atau mesin pencarian. [Pencarian](../src/lib/search.ts), [pool](../src/lib/db.ts), [cache](../src/lib/cache.ts)
-- Probe `/api/health/live` memeriksa respons proses dan `/api/health/ready` memeriksa koneksi serta adanya migrasi `002_notifications`. Skrip backup menghasilkan dump logis; unggahan yang masih tersimpan di PostgreSQL ikut tercakup. Jadwal backup, retensi, alarm, tujuan kapasitas dan drill pemulihan pada host tujuan masih perlu disiapkan. [Probe](../src/app/api/health), [operasi](../ops/operations.md), [pemulihan](../ops/backup-restore.md)
+- Probe `/api/health/live` memeriksa respons proses dan `/api/health/ready` memeriksa koneksi, daftar migrasi, indeks admin tunggal dan kolom bukti MFA. Skrip backup menghasilkan dump logis; unggahan yang masih tersimpan di PostgreSQL ikut tercakup. Jadwal backup, retensi, alarm, tujuan kapasitas dan drill pemulihan pada host tujuan masih perlu disiapkan. [Probe](../src/app/api/health), [operasi](../ops/operations.md), [pemulihan](../ops/backup-restore.md)
 - Perubahan mengikuti aturan [AGENTS.md](../AGENTS.md). Riwayat rilis empat bagian tersimpan di [CHANGELOG](../CHANGELOG.md). Ikuti [prioritas pengembangan](lanjutan.md) untuk pekerjaan berikutnya.
 
 ## Referensi Pondasi

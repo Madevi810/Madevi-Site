@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
+import { databaseUrl } from "../src/lib/env.ts";
 import { mkdtemp, open, link, realpath, rm } from "node:fs/promises";
 import { dirname, basename, join, relative, resolve, isAbsolute, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-if (!process.env.DATABASE_URL || !process.argv[2]) throw new Error("DATABASE_URL dan tujuan file backup wajib diisi.");
+const connection = databaseUrl();
+if (!process.argv[2]) throw new Error("DATABASE_URL dan tujuan file backup wajib diisi.");
 const root = await realpath(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const supplied = resolve(process.argv[2]);
 const destinationDirectory = await realpath(dirname(supplied));
@@ -20,7 +22,8 @@ try {
   file = await open(temporary, "wx", 0o600);
   const result = await new Promise((resolveRun, reject) => {
     const child = spawn("pg_dump", ["--format=custom"], {
-      env: { ...process.env, PGDATABASE: process.env.DATABASE_URL },
+      env: { ...process.env, PGDATABASE: connection, PGCONNECT_TIMEOUT: "5" },
+      signal: AbortSignal.timeout(600_000),
       stdio: ["ignore", file.fd, "ignore"]
     });
     child.once("error", () => reject(new Error("pg_dump tidak tersedia atau tidak dapat dijalankan.")));

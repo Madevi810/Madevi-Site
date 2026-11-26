@@ -29,7 +29,7 @@ Domain adalah nama yang diketik pengguna. DNS mengarahkan nama itu ke alamat IP 
 
 1. Untuk domain kustom, siapkan akses registrar dan panel DNS, pilih nama khusus staging, lalu tentukan target sesuai host. Subdomain bawaan Render dapat dipakai lebih dulu.
 2. Pada Render, tambahkan nama ke **Custom Domains** dan salin record yang diminta. Untuk subdomain umumnya gunakan CNAME menuju target yang ditunjukkan. Tambahkan record verifikasi bila diminta. Pada VPS umumnya buat record A ke IPv4 server, lalu tambahkan AAAA jika server memang melayani IPv6. Hindari record lama untuk nama yang sama bila tujuannya berbeda. [Domain kustom Render](https://render.com/docs/custom-domains)
-3. Siapkan HTTPS provider atau Caddy. Samakan `BETTER_AUTH_URL` dengan origin HTTPS yang dipilih dan ubah callback OAuth bila fitur itu dipakai. Sertifikat harus mencakup host tersebut. Jika ada proxy, aktifkan `TRUST_PROXY_HEADERS` hanya setelah origin tidak bisa diakses langsung dan proxy terakhir menimpa `X-Real-IP`.
+3. Siapkan HTTPS provider atau Caddy. Samakan `BETTER_AUTH_URL` dengan origin HTTPS yang dipilih dan ubah callback OAuth bila fitur itu dipakai. Sertifikat harus mencakup host tersebut. Jika ada proxy, aktifkan `TRUST_PROXY_HEADERS` hanya setelah origin tidak bisa diakses langsung dan proxy terakhir menimpa `X-Real-IP` dan `X-Madevi-Proxy-Token`. [Konfigurasi Caddy](../ops/reverse-proxy.example.md)
 4. Uji DNS dari jaringan lain dan periksa apakah browser menerima sertifikat. Pastikan redirect HTTP → HTTPS hanya pada host yang benar. Bila gagal, periksa record yang berbenturan, waktu cache DNS, firewall 80/443, dan log penerbitan sertifikat. Simpan nilai record, waktu cache atau TTL, serta environment sebelumnya untuk [pemulihan domain](ganti-layanan.md#contoh-mengganti-domain).
 
 ## SMTP dan pengirim · wajib jika membuka pendaftaran email
@@ -47,7 +47,7 @@ SMTP adalah protokol yang dipakai server untuk menyerahkan email ke provider. No
    MAIL_FROM=no-reply@example.invalid
    ```
 
-   Ganti alamat dengan pengirim yang sudah diverifikasi. Kode memakai TLS langsung untuk port 465 dan mendukung upgrade STARTTLS pada port seperti 2525 ketika server menawarkannya. Pastikan port dan koneksi terenkripsi sesuai pengaturan provider dan host. [Pembatasan Render](https://render.com/articles/can-i-send-email-over-smtp-from-render), [Pembatasan DigitalOcean](https://docs.digitalocean.com/support/why-is-smtp-blocked/)
+   Ganti alamat dengan pengirim yang sudah diverifikasi. Kode memakai TLS langsung untuk port 465 dan mewajibkan STARTTLS pada port lain di staging dan produksi. Pastikan port dan koneksi terenkripsi sesuai pengaturan provider dan host. [Pembatasan Render](https://render.com/articles/can-i-send-email-over-smtp-from-render), [Pembatasan DigitalOcean](https://docs.digitalocean.com/support/why-is-smtp-blocked/)
 3. Restart atau rilis ulang sesuai host. Daftar akun uji, lihat status pengiriman provider dan cek inbox, lalu selesaikan verifikasi, perubahan email dan reset. Jika koneksi timeout, periksa port keluar atau limit host. Jika pengiriman ditolak, cocokkan token, izin kirim dan pengirim. Jika terkirim tetapi tautan salah, periksa `BETTER_AUTH_URL`. Jika perlu membatalkan perubahan, pulihkan satu set konfigurasi lama atau kosongkan kelimanya dan restart untuk menutup alur SMTP.
 
 ## Google OAuth · opsional
@@ -56,7 +56,7 @@ OAuth memungkinkan pengguna memberi izin kepada Google untuk mengonfirmasi ident
 
 1. Siapkan konfigurasi persetujuan di **Google Auth Platform**, termasuk nama aplikasi, kontak, audiens dan test users untuk staging. Di **Clients**, buat client jenis **Web application**. Masukkan authorized redirect URI `https://staging.example.invalid/api/auth/callback/google` dengan host yang sesungguhnya. Callback adalah alamat tempat Google mengembalikan hasil login. [Google OAuth untuk aplikasi web](https://developers.google.com/identity/protocols/oauth2/web-server)
 2. Isi `GOOGLE_CLIENT_ID` dan `GOOGLE_CLIENT_SECRET` dari client tersebut pada environment server. Gunakan client terpisah untuk staging dan production. Restart setelah pasangan dimasukkan.
-3. Buka Profil dan coba tombol Google dengan akun uji. Pastikan alur kembali ke host benar dan lengkapi username/tanggal lahir bila diminta. Coba batal pada layar persetujuan. `redirect_uri_mismatch` berarti skema, host, port atau path berbeda dari allowlist. `access_denied` bisa berarti akun belum masuk daftar penguji atau persetujuan dibatalkan. Bila ingin menonaktifkan integrasi, kosongkan kedua nilai dan restart. Akun yang hanya memakai Google perlu dipertimbangkan sebelum mematikan jalur login.
+3. Buka Profil dan coba tombol Google dengan akun pengguna biasa. Akun pengelola memakai password dan MFA. Pastikan alur kembali ke host benar dan lengkapi username/tanggal lahir bila diminta. Coba batal pada layar persetujuan. `redirect_uri_mismatch` berarti skema, host, port atau path berbeda dari allowlist. `access_denied` bisa berarti akun belum masuk daftar penguji atau persetujuan dibatalkan. Bila ingin menonaktifkan integrasi, kosongkan kedua nilai dan restart. Akun yang hanya memakai Google perlu dipertimbangkan sebelum mematikan jalur login.
 
 ## Penyimpanan dan monitoring · sesuai tahap
 

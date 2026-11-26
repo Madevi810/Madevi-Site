@@ -9,6 +9,21 @@ import { SocialProfileSettings } from "./social-profile-settings";
 import { profilePane, pillTabs, pillButton, pillActive, pillInactive, profileContent, logout, fineText, primaryButton, outlineButton, formLayout, statusMessage, textButton } from "./styles";
 type View = "signin" | "signup" | "forgot" | "reset";
 const PENDING_PHOTO = "madevi-pending-profile-photo";
+const photoTypes = ["image/png", "image/jpeg", "image/webp"];
+const maxPhotoBytes = 1_000_000;
+
+function pendingPhoto(data: unknown, email: string): File | null {
+  if (!data || typeof data !== "object") return null;
+  const stored = data as { email?: unknown; data?: unknown; type?: unknown; created?: unknown };
+  if (typeof stored.email !== "string" || stored.email.toLowerCase() !== email.toLowerCase() ||
+      typeof stored.created !== "number" || stored.created > Date.now() || Date.now() - stored.created >= 86400000) return null;
+  if (typeof stored.type !== "string" || !photoTypes.includes(stored.type) || typeof stored.data !== "string") throw new Error("Foto tidak valid");
+  const prefix = `data:${stored.type};base64,`;
+  if (!stored.data.startsWith(prefix) || stored.data.length > prefix.length + Math.ceil(maxPhotoBytes / 3) * 4) throw new Error("Foto tidak valid");
+  const decoded = atob(stored.data.slice(prefix.length));
+  if (!decoded.length || decoded.length > maxPhotoBytes) throw new Error("Foto tidak valid");
+  return new File([Uint8Array.from(decoded, char => char.charCodeAt(0))], "profile", { type: stored.type });
+}
 export function Profile({
   english
 }: {
@@ -28,6 +43,8 @@ export function Profile({
   const [working, setWorking] = useState(false);
   const [twoFactor, setTwoFactor] = useState(false);
   const [google, setGoogle] = useState(false);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [pendingPhotoError, setPendingPhotoError] = useState(false);
   const [complete, setComplete] = useState<boolean | null>(null);
   const [profileLoadError, setProfileLoadError] = useState(false);
   const [profileRetry, setProfileRetry] = useState(0);
@@ -39,7 +56,13 @@ export function Profile({
   const [photoPreview, setPhotoPreview] = useState("");
   const t = (id: string, en: string) => english ? en : id;
   useEffect(() => {
-    fetch("/api/features").then(r => r.json()).then(r => setGoogle(Boolean(r.google))).catch(() => setGoogle(false));
+    fetch("/api/features").then(r => {
+      if (!r.ok) throw new Error("Fitur belum dapat diperiksa");
+      return r.json();
+    }).then(features => {
+      setGoogle(Boolean(features.google));
+      setEmailAvailable(Boolean(features.email));
+    }).catch(() => setGoogle(false));
   }, []);
   useEffect(() => {
     if (!session?.user.id) {setComplete(null);setProfileLoadError(false);setProfileMeta({username:"",city:""});return;}
@@ -59,48 +82,35 @@ export function Profile({
     return () => URL.revokeObjectURL(url);
   }, [photo]);
   useEffect(() => {
-    if (!session?.user.email || !complete) return;
-    let pending: {
-      email: string;
-      data: string;
-      type: string;
-      created: number;
-    } | null = null;
+    if (!session?.user.email) {
+      setPendingPhotoError(false);
+      return;
+    }
+    if (!complete) return;
+    let photo: File | null;
     try {
-      pending = JSON.parse(sessionStorage.getItem(PENDING_PHOTO) || "null");
-    } catch {
-      return;
-    }
-    if (!pending) return;
-    if (Date.now() - pending.created > 86400000) {
+      const stored = sessionStorage.getItem(PENDING_PHOTO);
+      if (!stored) return;
+      // Consume once, even when an old or corrupt entry cannot be uploaded.
       sessionStorage.removeItem(PENDING_PHOTO);
+      photo = pendingPhoto(JSON.parse(stored), session.user.email);
+    } catch {
+      setPendingPhotoError(true);
       return;
     }
-    if (pending.email.toLowerCase() !== session.user.email.toLowerCase()) return;
-    let cancelled = false;
-    const data = pending.data;
-    const type = pending.type;
+    if (!photo) return;
+    const body = new FormData();
+    body.append("avatar", photo);
     void (async () => {
       try {
-        const blob = await (await fetch(data)).blob();
-        const body = new FormData();
-        body.append("avatar", new File([blob], "profile", {
-          type
-        }));
-        const response = await fetch("/api/account/avatar", {
-          method: "POST",
-          body
-        });
-        if (response.ok && !cancelled) {
-          sessionStorage.removeItem(PENDING_PHOTO);
-          setAvatarMissing(false);
-          setAvatarVersion(Date.now());
-        }
-      } catch {/* user may retry in account settings */}
+        const response = await fetch("/api/account/avatar", { method: "POST", body, signal: AbortSignal.timeout(12000) });
+        if (!response.ok) throw new Error("Foto belum tersimpan");
+        setAvatarMissing(false);
+        setAvatarVersion(Date.now());
+      } catch {
+        setPendingPhotoError(true);
+      }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [session?.user.email, complete]);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,7 +126,7 @@ export function Profile({
       setSignupStep(2);
       return;
     }
-    if (view === "signup" && photo && (photo.size > 1000000 || !['image/png', 'image/jpeg', 'image/webp'].includes(photo.type))) {
+    if (view === "signup" && photo && (photo.size > maxPhotoBytes || !photoTypes.includes(photo.type))) {
       setMessage(t("Foto harus JPG, PNG, atau WebP dan maksimal 1 MB.", "Photo must be JPG, PNG, or WebP and at most 1 MB."));
       return;
     }
@@ -247,7 +257,7 @@ export function Profile({
       await refetch();
     }}><LogOut size={17} />{t("Keluar", "Sign out")}</button></div>;
   if (user && passwordRecovery) return <PasswordRecovery email={user.email} english={english} onBack={() => setPasswordRecovery(false)} />;
-  if (user) return <div className={profilePane}><div className={pillTabs}><button className={`${pillButton} ${profileView === "status" ? pillActive : pillInactive}`} onClick={() => setProfileView("status")}>Status</button><button className={`${pillButton} ${profileView === "settings" ? pillActive : pillInactive}`} onClick={() => setProfileView("settings")}>{t("Pengaturan", "Settings")}</button></div><div className={profileContent}>{profileView === "status" ? <><div className="flex flex-col items-center text-center"><div className="grid h-madevi-92 w-madevi-92 place-items-center overflow-hidden rounded-full bg-madevi-soft">{avatarMissing ? <UserRound size={38} /> : <img className="h-full w-full object-cover" src={`/api/account/avatar?v=${avatarVersion}`} alt="" onError={() => setAvatarMissing(true)} />}</div><h3 className="mb-madevi-3 mt-madevi-14 text-madevi-18">{user.name}</h3>{profileMeta.username && <p className="m-0 text-madevi-muted">@{profileMeta.username}</p>}{profileMeta.city && <p className="mt-madevi-8 flex items-center gap-madevi-4 text-madevi-muted"><MapPin size={15} />{profileMeta.city}</p>}</div><div className="mt-madevi-20 flex flex-col gap-madevi-8">{([[t("Pesan", "Messages"), MessageCircle], [t("Daftar simpan", "Saved items"), Bookmark], [t("Belajar", "Learning"), GraduationCap], [t("Katalog belanja", "Shopping catalog"), ShoppingBag], [t("Riwayat", "History"), History]] as const).map(([label, Icon]) => <div key={label} className="flex w-full items-center gap-madevi-12 rounded-madevi-pill border border-madevi-line bg-madevi-surface px-madevi-15 py-madevi-9"><span className="grid h-madevi-35 w-madevi-35 place-items-center rounded-full bg-madevi-soft"><Icon size={18} /></span><strong className="flex-1">{label}</strong><span className="text-madevi-muted">{t("Belum tersedia", "Unavailable")}</span></div>)}</div></> : <ProfileSettings name={user.name} email={user.email} refetch={refetch} english={english} onProfileUpdate={meta => setProfileMeta(meta)} onReset={() => setPasswordRecovery(true)} onAvatar={() => {
+  if (user) return <div className={profilePane}><div className={pillTabs}><button className={`${pillButton} ${profileView === "status" ? pillActive : pillInactive}`} onClick={() => setProfileView("status")}>Status</button><button className={`${pillButton} ${profileView === "settings" ? pillActive : pillInactive}`} onClick={() => setProfileView("settings")}>{t("Pengaturan", "Settings")}</button></div><div className={profileContent}>{pendingPhotoError && <p className={statusMessage} role="alert">{t("Foto pendaftaran belum tersimpan. Tambahkan kembali di Pengaturan.", "Your registration photo was not saved. Add it again in Settings.")}</p>}{profileView === "status" ? <><div className="flex flex-col items-center text-center"><div className="grid h-madevi-92 w-madevi-92 place-items-center overflow-hidden rounded-full bg-madevi-soft">{avatarMissing ? <UserRound size={38} /> : <img className="h-full w-full object-cover" src={`/api/account/avatar?v=${avatarVersion}`} alt="" onError={() => setAvatarMissing(true)} />}</div><h3 className="mb-madevi-3 mt-madevi-14 text-madevi-18">{user.name}</h3>{profileMeta.username && <p className="m-0 text-madevi-muted">@{profileMeta.username}</p>}{profileMeta.city && <p className="mt-madevi-8 flex items-center gap-madevi-4 text-madevi-muted"><MapPin size={15} />{profileMeta.city}</p>}</div><div className="mt-madevi-20 flex flex-col gap-madevi-8">{([[t("Pesan", "Messages"), MessageCircle], [t("Daftar simpan", "Saved items"), Bookmark], [t("Belajar", "Learning"), GraduationCap], [t("Katalog belanja", "Shopping catalog"), ShoppingBag], [t("Riwayat", "History"), History]] as const).map(([label, Icon]) => <div key={label} className="flex w-full items-center gap-madevi-12 rounded-madevi-pill border border-madevi-line bg-madevi-surface px-madevi-15 py-madevi-9"><span className="grid h-madevi-35 w-madevi-35 place-items-center rounded-full bg-madevi-soft"><Icon size={18} /></span><strong className="flex-1">{label}</strong><span className="text-madevi-muted">{t("Belum tersedia", "Unavailable")}</span></div>)}</div></> : <ProfileSettings name={user.name} email={user.email} refetch={refetch} english={english} onProfileUpdate={meta => setProfileMeta(meta)} onReset={() => setPasswordRecovery(true)} onAvatar={() => {
         setAvatarMissing(false);
         setAvatarVersion(Date.now());
       }} />}</div><button className={logout} onClick={async () => {
@@ -265,6 +275,7 @@ export function Profile({
         setMessage("");
         setTwoFactor(false);
       }}>{t("Daftar", "Register")}</button></div><form className={formLayout} onSubmit={submit}>
+    {emailAvailable === false && (view === "signup" || view === "forgot") && <p className={statusMessage} role="status">{t("Layanan email belum tersedia.", "Email service is not available yet.")}</p>}
     {view === "signup" && !twoFactor ? <><div className="text-center text-madevi-12 text-madevi-muted" aria-live="polite">{t(`Langkah ${signupStep} dari 2`, `Step ${signupStep} of 2`)} · {signupStep === 1 ? t("Akun", "Account") : t("Profil", "Profile")}</div><div hidden={signupStep !== 1} className={signupStep === 1 ? "flex flex-col gap-madevi-13" : "hidden"}><Field label="Username" name="username" minLength={3} maxLength={30} pattern="[a-zA-Z0-9_.-]+" required={signupStep === 1} /><p className={fineText}>{t("Username tidak dapat diubah setelah akun dibuat.", "Username cannot be changed after account creation.")}</p><Field label="Email" name="email" type="email" required={signupStep === 1} /><Field label={t("Nomor telepon (opsional)", "Phone number (optional)")} name="phone" type="tel" /><Field label={t("Kata sandi", "Password")} name="password" type="password" revealLabels={{show:t("Tampilkan kata sandi","Show password"),hide:t("Sembunyikan kata sandi","Hide password")}} minLength={10} autoComplete="new-password" required={signupStep === 1} /><Field label={t("Konfirmasi kata sandi", "Confirm password")} name="confirm" type="password" revealLabels={{show:t("Tampilkan kata sandi","Show password"),hide:t("Sembunyikan kata sandi","Hide password")}} autoComplete="new-password" aria-invalid={passwordMismatch || undefined} aria-describedby={passwordMismatch ? "signup-password-error" : undefined} onChange={()=>setPasswordMismatch(false)} required={signupStep === 1} />{passwordMismatch && <p id="signup-password-error" role="alert" className={fineText}>{t("Konfirmasi kata sandi tidak cocok.","Passwords do not match.")}</p>}</div><div hidden={signupStep !== 2} className={signupStep === 2 ? "flex flex-col gap-madevi-13" : "hidden"}><PhotoEditor english={english} image={photoPreview} onFile={setPhoto} onRemove={() => setPhoto(null)} /><Field label={t("Nama lengkap", "Full name")} name="name" minLength={2} required={signupStep === 2} /><Field label={t("Tanggal lahir", "Date of birth")} name="birthDate" type="date" max={new Date().toISOString().slice(0, 10)} required={signupStep === 2} /><Field label={t("Kota asal", "City of origin")} name="city" maxLength={100} required={signupStep === 2} /><p className={fineText}>{t("Foto dikirim setelah verifikasi dan masuk di tab ini.", "Your photo uploads after verification and sign-in in this tab.")}</p></div></> : twoFactor ? <Field label={t("Kode autentikator", "Authenticator code")} name="code" autoComplete="one-time-code" required /> : view === "signin" ? <><Field label={t("Username atau email", "Username or email")} name="identity" autoComplete="username" required /><Field label={t("Kata sandi", "Password")} name="password" type="password" revealLabels={{show:t("Tampilkan kata sandi","Show password"),hide:t("Sembunyikan kata sandi","Hide password")}} autoComplete="current-password" required /></> : view === "forgot" ? <Field label="Email" name="email" type="email" required /> : <><Field label={t("Kode OTP email", "Email OTP code")} name="otp" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" required /><Field label={t("Kata sandi baru", "New password")} name="password" type="password" revealLabels={{show:t("Tampilkan kata sandi","Show password"),hide:t("Sembunyikan kata sandi","Hide password")}} minLength={10} autoComplete="new-password" required /><Field label={t("Konfirmasi kata sandi", "Confirm password")} name="confirm" type="password" revealLabels={{show:t("Tampilkan kata sandi","Show password"),hide:t("Sembunyikan kata sandi","Hide password")}} autoComplete="new-password" required /></>}
     {message && <p className={statusMessage} role="status">{message}</p>}{view === "signup" && signupStep === 2 && <button type="button" className={`${outlineButton} w-full`} onClick={() => {
         setSignupStep(1);

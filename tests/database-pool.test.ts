@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pool } from "../src/lib/db.ts";
+import { createDatabasePool } from "../src/lib/postgres.ts";
+
+const pool = createDatabasePool("postgresql://127.0.0.1/madevi_ci_unit");
 
 test("an idle database error is handled without logging connection secrets", () => {
   const original = console.error;

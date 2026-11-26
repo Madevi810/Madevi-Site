@@ -71,3 +71,55 @@ export async function verifyRegressionJourneys({browser,origin,env,db}) {
     console.log('Lulus: navigasi dari profil admin menuju seluruh panel dan fallback query tidak valid.');
   } finally {await admin.close();}
 }
+
+export async function verifyRegistrationPhoto({ browser, origin, env, mail, image }) {
+  const context = await browser.newContext({ viewport: { width: 768, height: 1024 } });
+  const page = await context.newPage();
+  const username = "qa-photo-signup";
+  const key = "madevi-pending-profile-photo";
+  try {
+    await page.goto(origin);
+    await page.getByRole("button", { name: "Buka menu" }).click();
+    await page.getByRole("button", { name: "Profil", exact: true }).click();
+    await page.getByRole("button", { name: "Daftar", exact: true }).click();
+    await page.getByLabel("Username", { exact: true }).fill(username);
+    await page.getByLabel("Email", { exact: true }).fill(`${username}@example.invalid`);
+    await page.getByLabel("Kata sandi", { exact: true }).fill(env.DEMO_PASSWORD);
+    await page.getByLabel("Konfirmasi kata sandi", { exact: true }).fill(env.DEMO_PASSWORD);
+    await page.getByRole("button", { name: "Lanjut", exact: true }).click();
+    await page.getByLabel("Nama lengkap", { exact: true }).fill("Pengguna Foto Uji");
+    await page.getByLabel("Tanggal lahir", { exact: true }).fill("2000-01-01");
+    await page.getByLabel("Kota asal", { exact: true }).fill("Kota Uji");
+    await page.locator('input[type="file"]').setInputFiles({ name: "synthetic.png", mimeType: "image/png", buffer: image });
+    const before = mail.length;
+    await page.getByRole("button", { name: "Buat akun", exact: true }).click();
+    await page.getByText(/Foto akan dikirim setelah masuk di tab ini/).waitFor();
+    assert.equal(await page.evaluate(key => sessionStorage.getItem(key) !== null, key), true);
+    assert.ok(mail.length > before);
+    const message = mail.at(-1).replace(/=\r\n/g, "").replace(/=3D/g, "=");
+    const link = message.match(/http:\/\/127\.0\.0\.1:3000\/api\/auth\/verify-email[^\s]*/)?.[0];
+    assert.ok(link);
+    await page.goto(link);
+    await page.getByRole("button", { name: "Buka menu" }).click();
+    await page.getByRole("button", { name: "Profil", exact: true }).click();
+    await page.locator('input[name="identity"]').fill(username);
+    await page.locator('input[name="password"]').fill(env.DEMO_PASSWORD);
+    const upload = page.waitForResponse(response =>
+      response.url().endsWith("/api/account/avatar") && response.request().method() === "POST");
+    await page.getByRole("button", { name: "Masuk", exact: true }).last().click();
+    assert.equal((await upload).status(), 200, "registration photo uploads under CSP");
+    const avatar = await page.request.get(`${origin}/api/account/avatar`);
+    assert.equal(avatar.status(), 200);
+    assert.equal(avatar.headers()["content-type"], "image/webp");
+    assert.equal(await page.evaluate(key => sessionStorage.getItem(key), key), null);
+    await page.evaluate(({ key, username }) => sessionStorage.setItem(key, JSON.stringify({
+      email: `${username}@example.invalid`, type: "image/png", data: "invalid-stored-photo", created: Date.now(),
+    })), { key, username });
+    await page.reload();
+    await page.getByRole("button", { name: "Buka menu" }).click();
+    await page.getByRole("button", { name: "Profil", exact: true }).click();
+    await page.getByText(/Foto pendaftaran belum tersimpan/).waitFor();
+    assert.equal(await page.evaluate(key => sessionStorage.getItem(key), key), null, "corrupt temporary data is discarded");
+    console.log("Lulus: foto pendaftaran dengan CSP aktif; data sementara sukses maupun rusak dibersihkan.");
+  } finally { await context.close(); }
+}

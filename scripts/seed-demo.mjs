@@ -1,13 +1,16 @@
-import pg from "pg";
+import { createDatabasePool } from "../src/lib/postgres.ts";
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { isDemoAllowed } from "../src/lib/config.ts";
 if (!isDemoAllowed()) throw new Error("Akun demo hanya dapat dibuat di lingkungan dev lokal yang mengaktifkan demo, tanpa proxy tepercaya.");
 if (!process.env.DATABASE_URL || !process.env.DEMO_PASSWORD || process.env.DEMO_PASSWORD.length < 10) throw new Error("DATABASE_URL dan DEMO_PASSWORD minimal 10 karakter wajib diisi.");
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pool = createDatabasePool();
 const client = await pool.connect();
 try {
   await client.query("BEGIN");
+  await client.query("SELECT pg_advisory_xact_lock(7412301)");
+  const owner = await client.query('SELECT 1 FROM "user" WHERE "madeviRole"=\'admin\' AND NOT "isDemo"');
+  if (owner.rowCount) throw new Error("Gunakan database demo terpisah dari database yang memiliki admin pemilik.");
   for (const [display, role] of [["Madevi-Admin", "admin"], ["Madevi-User", "user"]]) {
     const normalized = display.toLowerCase();
     const exists = await client.query('SELECT id, "isDemo" FROM "user" WHERE username=$1', [normalized]);

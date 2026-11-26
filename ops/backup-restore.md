@@ -1,6 +1,6 @@
 # Backup dan pemulihan database
 
-**Status: rancangan; backup logis dan restore di lingkungan tujuan belum diuji.** Database Madevi akan dibuat baru. Tidak ada scheduler, enkripsi terkonfigurasi, atau penyimpanan terpisah yang sudah aktif.
+**Status: rancangan; backup logis dan restore di lingkungan tujuan belum diuji.** Siapkan backup pada database Madevi yang disetujui. Tidak ada scheduler, enkripsi terkonfigurasi, atau penyimpanan terpisah yang sudah aktif.
 
 ## Keputusan yang masih terbuka
 
@@ -17,7 +17,7 @@ Konfigurasikan akses database melalui environment privat, dengan izin minimum da
 npm run db:backup -- /direktori-privat/madevi.dump
 ```
 
-Skrip menolak tujuan di dalam folder project dan tujuan yang sudah ada, memakai berkas privat sementara dan hanya menyerahkan hasil yang tidak kosong setelah `pg_dump` berhasil. Tujuan harus mendukung hard link pada filesystem yang sama; fitur ini belum diuji pada provider. Enkripsi backup dan simpan salinannya di lokasi terpisah yang disetujui; batasi akses dan periksa keberhasilannya. Jangan simpan dump di `database/backups/`, Git, ZIP, atau server yang sama sebagai satu-satunya salinan.
+Skrip menolak tujuan di dalam folder project dan tujuan yang sudah ada, memakai berkas privat sementara dan hanya menyerahkan hasil yang tidak kosong setelah `pg_dump` berhasil. Batas koneksi klien 5 detik dan proses dump 10 menit. Tujuan harus mendukung hard link pada filesystem yang sama; fitur ini belum diuji pada provider. Enkripsi backup dan simpan salinannya di lokasi terpisah yang disetujui; batasi akses dan periksa keberhasilannya. Jangan simpan dump di `database/backups/`, Git, ZIP, atau server yang sama sebagai satu-satunya salinan.
 
 ## Restore terisolasi
 
@@ -33,4 +33,4 @@ Bandingkan versi dan checksum migrasi, jumlah record, serta login akun pengujian
 
 ## Pembersihan manual
 
-Sampai retensi dan scheduler disepakati, **jangan menghapus peristiwa keamanan berdasarkan angka asumsi**. Admin dapat memeriksa jumlah dan rentang tanggal `madevi_rate_limits` dan `madevi_security_events` secara read-only. Susun perintah pembersihan dengan ambang yang disetujui, uji di database sintetis lalu catat setiap pelaksanaan manual. Scheduler otomatis masih belum aktif.
+Sampai retensi dan scheduler disepakati, **jangan menghapus peristiwa keamanan berdasarkan angka asumsi**. Admin dapat memeriksa jumlah dan rentang tanggal `madevi_rate_limits` dan `madevi_security_events` secara read-only. Untuk `madevi_rate_limits`, gunakan ambang yang jauh melewati jendela request aktif. Periksa rencana query dan ukur jumlah baris sebelum menghapus per batch dengan role operasi. Untuk peristiwa keamanan, patuhi retensi dan kebutuhan investigasi yang sudah disetujui. Uji semua penghapusan pada database sintetis, periksa backup dan catat pelaksanaan. Scheduler otomatis masih belum aktif.

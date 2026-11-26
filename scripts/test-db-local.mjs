@@ -7,7 +7,9 @@ import { createHmac } from "node:crypto";
 import sharp from "sharp";
 import net from "node:net";
 import pg from "pg";
-const external=process.env.MADEVI_TEST_DATABASE_URL;
+import { databaseUrl } from "../src/lib/env.ts";
+import { smokeBuiltApplication, verifyRateIsolation, verifySessionAndProviderPolicy, verifyUnavailableDatabase } from "./qa-activation.mjs";
+const external = process.env.MADEVI_TEST_DATABASE_URL && databaseUrl({DATABASE_URL:process.env.MADEVI_TEST_DATABASE_URL, MADEVI_ENV:"dev"});
 if(external){const u=new URL(external);if(!["127.0.0.1","localhost","::1"].includes(u.hostname)||!/^\/madevi_ci_[a-z0-9_]+$/.test(u.pathname))throw Error("Pengujian PostgreSQL hanya untuk database lokal terisolasi dengan nama madevi_ci_*");}
 const instance=external?null:new PGlite();if(instance)await instance.waitReady;
 const server=instance?createServer(instance):null;if(server)await new Promise(resolve=>server.listen(25433,"127.0.0.1",resolve));
@@ -16,15 +18,21 @@ const db={exec:async sql=>external?realPool.query(sql):instance.exec(sql),close:
 const mail=[];
 const smtp=net.createServer(socket=>{socket.write("220 localhost ESMTP\r\n");let buffer="",dataMode=false;socket.on("data",chunk=>{buffer+=chunk.toString();for(;;){if(dataMode){const end=buffer.indexOf("\r\n.\r\n");if(end<0)break;mail.push(buffer.slice(0,end));buffer=buffer.slice(end+5);dataMode=false;socket.write("250 queued\r\n");continue}const n=buffer.indexOf("\r\n");if(n<0)break;const line=buffer.slice(0,n);buffer=buffer.slice(n+2);if(/^EHLO|^HELO/i.test(line))socket.write("250-localhost\r\n250 AUTH PLAIN LOGIN\r\n");else if(/^AUTH/i.test(line))socket.write("235 authenticated\r\n");else if(/^DATA/i.test(line)){dataMode=true;socket.write("354 end with dot\r\n")}else if(/^QUIT/i.test(line)){socket.end("221 bye\r\n")}else socket.write("250 ok\r\n")}})});
 await new Promise(resolve=>smtp.listen(25434,"127.0.0.1",resolve));
-const env={...process.env,DATABASE_URL:external||"postgresql://postgres:postgres@127.0.0.1:25433/postgres",BETTER_AUTH_SECRET:"local-integration-test-secret-only-at-least-32",BETTER_AUTH_URL:"http://127.0.0.1:3000",MADEVI_ENV:"dev",MADEVI_DEMO_MODE:"true",DEMO_PASSWORD:"test-only-secret-123",NODE_ENV:"development",SMTP_HOST:"127.0.0.1",SMTP_PORT:"25434",SMTP_USER:"test",SMTP_PASS:"test",MAIL_FROM:"test@example.invalid"};
+const env={...process.env,DATABASE_URL:external||"postgresql://postgres:postgres@127.0.0.1:25433/postgres",BETTER_AUTH_SECRET:"local-integration-test-secret-only-at-least-32",BETTER_AUTH_URL:"http://127.0.0.1:3000",MADEVI_ENV:"dev",MADEVI_DEMO_MODE:"true",DEMO_PASSWORD:"test-only-secret-123",NODE_ENV:"development",SMTP_HOST:"127.0.0.1",SMTP_PORT:"25434",SMTP_USER:"test",SMTP_PASS:"test",MAIL_FROM:"test@example.invalid",
+  GOOGLE_CLIENT_ID:"", GOOGLE_CLIENT_SECRET:"", TRUST_PROXY_HEADERS:"false", MADEVI_PROXY_SECRET:"", MEDIA_BACKEND:"postgres"};
 function run(args,variables=env){return new Promise((resolve,reject)=>{const p=spawn("node",args,{env:variables,stdio:"inherit"});p.on("close",c=>c===0?resolve():reject(new Error(`exit ${c}`)));p.on("error",reject);});}
 let app;
 try {
   await run(["scripts/migrate.mjs"]);await run(["scripts/migrate.mjs"]);
   await run(["scripts/migrate.mjs","--down"],{...env,ALLOW_SCHEMA_ROLLBACK:"true"});await run(["scripts/migrate.mjs"]);
   await run(["scripts/seed-demo.mjs"]);
+  await run(["scripts/check-ready.mjs"]);
   const rollbackWithAccount=spawn("node",["scripts/migrate.mjs","--down"],{env:{...env,ALLOW_SCHEMA_ROLLBACK:"true"},stdio:"ignore"});assert.notEqual(await new Promise(resolve=>rollbackWithAccount.on("close",resolve)),0,"rollback with accounts and no content must fail");
-  if(process.env.MADEVI_TEST_BUILD==="1")await run(["node_modules/next/dist/bin/next","build"],{...env,NODE_ENV:"production",MADEVI_ENV:"staging",BETTER_AUTH_URL:"https://localhost",MADEVI_DEMO_MODE:"false",NEXT_TELEMETRY_DISABLED:"1"});
+  if(process.env.MADEVI_TEST_BUILD==="1"){
+    await run(["node_modules/next/dist/bin/next","build"],{...env,NODE_ENV:"production",MADEVI_ENV:"staging",BETTER_AUTH_URL:"https://localhost",MADEVI_DEMO_MODE:"false",NEXT_TELEMETRY_DISABLED:"1"});
+    await smokeBuiltApplication(env, db, Boolean(external));
+  }
+  await verifyUnavailableDatabase(env);
   app=spawn("node",["node_modules/next/dist/bin/next","dev","--hostname","127.0.0.1","--port","3000"],{env,stdio:["ignore","pipe","pipe"]});
   app.stdout.resume(); app.stderr.resume();
   let ready=false; for(let n=0;n<45;n++){try{const r=await fetch("http://127.0.0.1:3000/");if(r.ok){ready=true;break}}catch{}await new Promise(resolve=>setTimeout(resolve,1000))} if(!ready)throw new Error("Aplikasi uji gagal dimulai");
@@ -89,10 +97,19 @@ try {
   assert.equal((await fetch(`${origin}/api/admin/users`,{headers:{cookie:userCookie}})).status,403,"user must not access admin data");
   assert.equal((await fetch(`${origin}/api/admin/reports`,{headers:{cookie:userCookie}})).status,403,"user must not access reports");
   assert.equal((await fetch(`${origin}/api/account/avatar`)).status,401,"private photo requires a session");
+  const legacyAvatar = await sharp({create:{width:8,height:8,channels:3,background:"#00ff00"}}).webp().toBuffer();
+  await db.exec(`INSERT INTO madevi_avatars(user_id,image)
+    SELECT id, decode('${legacyAvatar.toString("hex")}','hex') FROM "user" WHERE username='madevi-user'`);
+  const legacyResponse = await fetch(`${origin}/api/account/avatar`, {headers:{cookie:userCookie}});
+  assert.equal(legacyResponse.status, 200);
+  assert.deepEqual(Buffer.from(await legacyResponse.arrayBuffer()), legacyAvatar, "legacy avatar remains readable");
   const image=await sharp({create:{width:8,height:8,channels:3,background:"#ff0000"}}).png().toBuffer();const form=new FormData();form.append("avatar",new Blob([image],{type:"image/png"}),"test.png");
   assert.equal((await fetch(`${origin}/api/account/avatar`,{method:"POST",headers:{origin,cookie:userCookie},body:form})).status,200,"save profile photo");
   const avatar=await fetch(`${origin}/api/account/avatar`,{headers:{cookie:userCookie}});assert.equal(avatar.status,200);assert.equal(avatar.headers.get("content-type"),"image/webp");
   const storedAvatar=Buffer.from(await avatar.arrayBuffer());
+  const mediaSql = "SELECT (SELECT count(*) FROM madevi_avatars)::int AS legacy, (SELECT count(*) FROM madevi_media_variants)::int AS variants";
+  const mediaCounts = await (external ? realPool.query(mediaSql) : instance.query(mediaSql));
+  assert.deepEqual(mediaCounts.rows[0], {legacy:0,variants:3}, "explicit replacement keeps only the active variants");
   const avatarAudit=await (external?realPool.query("SELECT count(*)::int AS n FROM madevi_audit WHERE action='account.avatar.update'"):instance.query("SELECT count(*)::int AS n FROM madevi_audit WHERE action='account.avatar.update'"));assert.equal(avatarAudit.rows[0].n,1,"avatar update is audited");
   const brokenImage=new FormData();brokenImage.set("avatar",new Blob(["not an image"],{type:"image/png"}),"broken.png");assert.equal((await fetch(`${origin}/api/account/avatar`,{method:"POST",headers:{origin,cookie:userCookie},body:brokenImage})).status,400,"invalid image rejected");
   // The PGlite wire adapter corrupts its protocol after parameterized SQL errors.
@@ -154,6 +171,8 @@ try {
       for(const viewport of [{width:390,height:844},{width:1440,height:900}])for(const theme of ["light","dark"]){await page.setViewportSize(viewport);await page.goto(origin);await page.getByRole("button",{name:"Buka menu"}).click();await page.getByRole("button",{name:"Pengaturan",exact:true}).click();await page.getByRole("button",{name:theme==="dark"?"Gelap":"Terang",exact:true}).click();await page.waitForFunction(t=>document.documentElement.dataset.theme===t,theme);await page.reload();await page.waitForFunction(t=>document.documentElement.dataset.theme===t,theme);const heroBackground=await page.getByRole("heading",{name:"Ruang untuk terus belajar."}).evaluate(node=>getComputedStyle(node.closest("section")).backgroundColor);assert.notEqual(heroBackground,"rgba(0, 0, 0, 0)","hero keeps its theme background");await page.screenshot({animations:"disabled",path:`/tmp/madevi-v4-home-${viewport.width}-${theme}.png`});await page.getByRole("button",{name:"Buka menu"}).click();await page.getByText("Ruang Madevi",{exact:true}).last().waitFor();const reportWeight=await page.getByRole("dialog",{name:"Madevi"}).getByRole("button",{name:"Laporkan Masalah"}).evaluate(node=>getComputedStyle(node).fontWeight);assert.ok(Number(reportWeight)>=700,"report button remains bold");await page.screenshot({animations:"disabled",path:`/tmp/madevi-v4-menu-${viewport.width}-${theme}.png`});const menuBox=await page.getByRole("dialog",{name:"Madevi"}).boundingBox();assert.ok(menuBox&&Math.abs(menuBox.width-Math.min(viewport.width*.8,540))<2&&Math.abs(menuBox.x+menuBox.width-viewport.width)<2,"sidebar size and position");if(viewport.width===390&&theme==="light"){const pill=page.getByRole("navigation",{name:"Ruang Madevi"}).getByRole("link",{name:/Explore & Learn/});const box=await pill.boundingBox();assert.ok(box);await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.waitForTimeout(250);const active=await pill.evaluate(node=>({border:getComputedStyle(node).borderColor,scale:new DOMMatrix(getComputedStyle(node).transform).a}));assert.equal(active.border,"rgb(113, 102, 220)","room color on press");assert.ok(active.scale>1,"room grows on press");await page.mouse.move(0,0);await page.mouse.up();}await page.getByRole("dialog",{name:"Madevi"}).getByRole("button",{name:"Laporkan Masalah"}).click();const reportDialog=page.getByRole("dialog",{name:"Laporkan Masalah"});await reportDialog.waitFor();await page.screenshot({animations:"disabled",path:`/tmp/madevi-report-${viewport.width}-${theme}.png`});await reportDialog.getByRole("button",{name:"Tutup"}).click();const sidebar=await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21a","wcag21aa"]).analyze();if(sidebar.violations.length)console.error(JSON.stringify(sidebar.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({html:n.html,summary:n.failureSummary}))})),null,2));assert.deepEqual(sidebar.violations.map(v=>`${v.id}: ${v.nodes.length}`),[],`sidebar ${viewport.width} ${theme}`);await page.getByRole("button",{name:"Profil",exact:true}).click();await page.locator('input[name="identity"]').waitFor();await page.screenshot({animations:"disabled",path:`/tmp/madevi-v4-profile-${viewport.width}-${theme}.png`});await page.getByRole("button",{name:"Daftar",exact:true}).click();await page.getByText("Langkah 1 dari 2",{exact:false}).waitFor();await page.screenshot({animations:"disabled",path:`/tmp/madevi-signup-${viewport.width}-${theme}.png`});await page.getByRole("button",{name:"Masuk",exact:true}).first().click();await page.getByRole("button",{name:"Lupa password"}).click();await page.getByRole("button",{name:"Kirim kode OTP"}).waitFor();await page.screenshot({animations:"disabled",path:`/tmp/madevi-forgot-${viewport.width}-${theme}.png`});await page.goto(`${origin}/cari?q=contoh`);await page.getByRole("heading",{name:"Hasil pencarian"}).waitFor();await page.screenshot({path:`/tmp/madevi-v4-search-${viewport.width}-${theme}.png`});await page.goto(`${origin}/ruang/explore`);await page.getByText("Ruang ini sedang disiapkan.").waitFor();await page.screenshot({path:`/tmp/madevi-v4-room-${viewport.width}-${theme}.png`});await page.goto(`${origin}/admin`);await page.getByRole("heading",{name:"Masuk Admin"}).waitFor();assert.equal(await page.locator("html").getAttribute("data-theme"),theme,`admin theme ${theme}`);await page.screenshot({path:`/tmp/madevi-v4-admin-login-${viewport.width}-${theme}.png`});await page.goto(`${origin}/reset-password`);await page.getByText("Buka menu Profile di Madevi, lalu pilih Lupa password untuk meminta kode OTP melalui email.").waitFor();await page.screenshot({animations:"disabled",path:`/tmp/madevi-reset-${viewport.width}-${theme}.png`});await page.goto(`${origin}/admin`);await page.getByRole("heading",{name:"Masuk Admin"}).waitFor();const adminAxe=await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21a","wcag21aa"]).analyze();assert.deepEqual(adminAxe.violations.map(v=>`${v.id}: ${v.nodes.length}`),[],`admin ${viewport.width} ${theme}`)}
       await page.goto(origin);await page.getByRole("button",{name:"Buka menu"}).click();await page.getByRole("button",{name:"Pengaturan",exact:true}).click();await page.getByRole("button",{name:"English",exact:true}).click();await page.waitForFunction(()=>document.documentElement.lang==="en");await page.goto(`${origin}/ruang/explore`);await page.waitForFunction(()=>document.documentElement.lang==="en");await page.goto(origin);await page.getByRole("button",{name:"Open menu"}).click();await page.getByRole("button",{name:"Settings",exact:true}).click();await page.getByRole("button",{name:"Indonesia",exact:true}).click();await page.waitForFunction(()=>document.documentElement.lang==="id");
       const { verifyRegressionJourneys }=await import("./qa-browser.mjs");await verifyRegressionJourneys({browser,origin,env,db});
+      const { verifyRegistrationPhoto } = await import("./qa-browser.mjs");
+      await verifyRegistrationPhoto({browser,origin,env,mail,image});
       console.log("Lulus: ponsel dan desktop, tema terang/gelap, sidebar, profil dan masuk admin; axe pada sidebar dan login admin.");}finally{await browser.close()}
   }
   async function action(action){return fetch(`${origin}/api/admin/users`,{method:"POST",headers:{cookie:adminCookie,origin,"content-type":"application/json"},body:JSON.stringify({id:user.id,action})})}
@@ -163,6 +182,12 @@ try {
   const update=await fetch(`${origin}/api/auth/update-user`,{method:"POST",headers:{cookie:adminCookie,origin,"content-type":"application/json"},body:JSON.stringify({username:"different-name"})});assert.notEqual(update.status,200,"username must be immutable");
   assert.equal((await fetch(`${origin}/api/admin/users`,{method:"POST",headers:{cookie:adminCookie,origin:"http://malicious.invalid","content-type":"application/json"},body:JSON.stringify({id:user.id,action:"block"})})).status,403,"cross-origin admin operation must be rejected");
   assert.equal((await fetch(`${origin}/api/auth/sign-up/email`,{method:"POST",headers:{origin,"content-type":"application/json"},body:"{}"})).status,403,"direct signup must be blocked");
+  await verifyRateIsolation(origin, db, env.DEMO_PASSWORD);
+  await verifySessionAndProviderPolicy(run, env);
+  assert.equal(
+    (await fetch(`${origin}/api/auth/link-social`, {method:"POST", headers:{origin,cookie:adminCookie,"content-type":"application/json"}, body:JSON.stringify({provider:"google"})})).status,
+    403, "admin cannot start provider linking",
+  );
   // Enrollment is an independent auth scenario; keep its traffic isolated.
   await db.exec("DELETE FROM madevi_rate_limits");
   await db.exec('UPDATE "user" SET "isDemo"=false WHERE username=\'madevi-admin\'');
@@ -172,7 +197,12 @@ try {
   const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";let bits="";for(const c of secret.replace(/=+$/,""))bits+=alphabet.indexOf(c).toString(2).padStart(5,"0");const key=Buffer.from((bits.match(/.{8}/g)||[]).map(x=>parseInt(x,2)));const counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));const hash=createHmac("sha1",key).update(counter).digest();const offset=hash[hash.length-1]&15;const totp=String((hash.readUInt32BE(offset)&0x7fffffff)%1000000).padStart(6,"0");
   const verify=await fetch(`${origin}/api/auth/two-factor/verify-totp`,{method:"POST",headers:{cookie:adminCookie,origin,"content-type":"application/json"},body:JSON.stringify({code:totp,trustDevice:false})});assert.equal(verify.status,200,"MFA verification");
   const refreshed=verify.headers.getSetCookie().filter(x=>!x.includes("Max-Age=0")).map(x=>x.split(";")[0]).join("; ");
-  const mfaCookie=refreshed||adminCookie;assert.equal((await fetch(`${origin}/api/admin/users`,{headers:{cookie:mfaCookie}})).status,200,"admin with MFA can access admin data");
+  const mfaCookie=refreshed||adminCookie;
+  assert.equal((await fetch(`${origin}/api/admin/users`,{headers:{cookie:adminCookie}})).status,403,"old password-only session cannot inherit MFA");
+  assert.equal((await fetch(`${origin}/api/admin/users`,{headers:{cookie:mfaCookie}})).status,200,"admin with MFA can access admin data");
+  await db.exec(`UPDATE "session" SET "madeviMfa"=false WHERE "userId"=(SELECT id FROM "user" WHERE username='madevi-admin')`);
+  assert.ok(await (await fetch(`${origin}/api/auth/get-session`,{headers:{cookie:mfaCookie}})).json(), "legacy-style session still authenticates");
+  assert.equal((await fetch(`${origin}/api/admin/users`,{headers:{cookie:mfaCookie}})).status,403,"MFA-enabled account needs proof on its individual session");
   // Isolate this challenge from earlier auth traffic in the temporary test database.
   await db.exec('DELETE FROM madevi_rate_limits');
   assert.equal((await fetch(`${origin}/api/auth/sign-out`,{method:"POST",headers:{cookie:mfaCookie,origin,"content-type":"application/json"},body:"{}"})).status,200);
@@ -187,7 +217,7 @@ try {
   if(process.env.MADEVI_TEST_LOAD==="1"){
     const times=[];const loadStarted=performance.now();for(let batch=0;batch<10;batch++)await Promise.all(Array.from({length:3},async()=>{const start=performance.now();const response=await fetch(`${origin}/api/content?limit=1`);assert.equal(response.status,200);times.push(performance.now()-start)}));times.sort((a,b)=>a-b);const p95=times[Math.ceil(times.length*.95)-1];assert.ok(p95<2000,`local p95 ${p95.toFixed(0)}ms`);console.log(`Lulus: beban ringan 30 permintaan, 3 bersamaan, 0 error, p50 ${times[14].toFixed(0)} ms, p95 ${p95.toFixed(0)} ms, max ${times.at(-1).toFixed(0)} ms, durasi ${(performance.now()-loadStarted).toFixed(0)} ms.`);
   }
-  let limited=false;for(let i=0;i<20;i++){const response=await fetch(`${origin}/api/auth/sign-in/username`,{method:"POST",headers:{origin,"content-type":"application/json"},body:JSON.stringify({username:"invalid-test",password:"invalid-test"})});if(response.status===429){assert.equal(response.headers.get("retry-after"),"60");limited=true;break}}assert.ok(limited,"failed login attempts must be rate limited");
+
   if(external){
   await db.exec('ALTER TABLE madevi_rate_limits RENAME TO madevi_rate_limits_qa_unavailable');
   try {const unavailable=await fetch(`${origin}/api/features`);assert.equal(unavailable.status,503,"database limiter failure fails closed");assert.equal((await fetch(`${origin}/api/health/live`)).status,200,"liveness stays available during degraded dependency");}

@@ -6,7 +6,7 @@ Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplika
 
 - Gunakan layanan monitoring untuk mengecek `/api/health/live` (proses menjawab) dan `/api/health/ready` (koneksi database dan migrasi tersedia). Tentukan interval, batas kegagalan berturut-turut, penerima alarm, dan petugas yang merespons. Uji alarm dan pulihnya secara terkendali pada staging.
 - Pantau penggunaan penyimpanan PostgreSQL, durasi query, HTTP 5xx, kegagalan autentikasi, email tertolak, dan batas biaya. Pilih retensi log serta akses. Catat waktu kejadian dan commit. Hindari merekam URI database, password, token, isi email atau data pribadi. [Contoh monitoring](../ops/monitoring.example.yaml), [tata kelola data](../ops/data-governance.md)
-- Jika readiness 503 dan liveness 200, periksa koneksi database, CA, akses jaringan, kuota dan `002_notifications`. Jika keduanya gagal, periksa proses, port, HTTPS/proxy dan versi image. Kegagalan SMTP atau Google harus diuji dari alur pengguna karena probe tidak memeriksanya. [Respons insiden](../ops/incident-response.md)
+- Jika readiness 503 dan liveness 200, periksa koneksi database, CA, akses jaringan, kuota dan status migrasi, indeks admin dan kolom bukti MFA. Jika keduanya gagal, periksa proses, port, HTTPS/proxy dan versi image. Kegagalan SMTP atau Google harus diuji dari alur pengguna karena probe tidak memeriksanya. [Respons insiden](../ops/incident-response.md)
 
 ## Backup dan latihan pemulihan
 

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   const admin = await currentAdmin();
   if (admin) return <AdminShell name={admin.session.user.name} />;
-  const account = await currentAccount();
+  const account = await currentAccount({ allowMfaEnrollment: true });
   return <AdminLogin needsMfa={Boolean(account && account.row.madeviRole === "admin" && !account.row.twoFactorEnabled)} />;
 }
 

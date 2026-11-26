@@ -11,8 +11,3 @@ export function isDemoAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
       ![...db.searchParams.keys()].some(key => ["host", "hostaddr"].includes(key.toLowerCase()));
   } catch { return false; }
 }
-
-export function emailConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
-  return Boolean(env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS && env.MAIL_FROM);
-}
-

@@ -12,13 +12,15 @@ Madevi adalah platform web edukasi dan layanan digital. Pengunjung dapat menemuk
 | Madevi Services | Informasi, simulasi, dan pemesanan jasa digital. |
 | Madevi Line | Ruang kreativitas dan berbagi cerita dengan fitur komunitas dan moderasi. |
 
+Kepemilikan proyek saat ini berada pada satu pemilik dengan satu admin pengendali. Akun pengguna mengikuti pendaftaran website. Panduan [aktivasi default](docs/aktivasi-default.md) adalah titik mulai saat ingin menyiapkan layanan.
+
 Explore & Learn dan Tutorial & Problem Solve menjadi prioritas pengembangan konten. Saat ini ketujuh halaman ruang tersedia sebagai kerangka dan taksonomi serta konten asli belum diisi. Alur bersama mencakup pencarian judul, halaman baca teks terbit, pengelolaan draf dan publikasi, profil dan avatar, notifikasi umum dan sistem, pelaporan, serta panel admin dengan MFA.
 
 Pendaftaran, verifikasi, perubahan email, dan pemulihan kata sandi memerlukan SMTP. Google OAuth memiliki konfigurasi opsional dan masih memerlukan uji penyedia. Halaman kebijakan, bantuan, fitur simpan, dan ikon sosial developer masih berupa penanda. Modul khusus lima ruang lainnya masih direncanakan. Status proyek adalah **pengembangan lokal, belum siap menerima pengguna nyata**.
 
 ## Cuplikan aplikasi lokal
 
-Cuplikan diambil dari build pengembangan lokal Madevi V0.0.0.18. Profil dan admin memakai akun demo sintetis. [Cara mengambil ulang galeri](docs/screenshot.md)
+Cuplikan diambil dari build pengembangan lokal Madevi V0.0.0.19. Profil dan admin memakai akun demo sintetis. [Cara mengambil ulang galeri](docs/screenshot.md)
 
 <table>
   <tr>
@@ -66,6 +68,7 @@ Aplikasi memakai Node.js 24, Next.js App Router, React, TypeScript, PostgreSQL m
 
 | Perintah | Kegunaan |
 | --- | --- |
+| `npm run check:ready` | Validasi konfigurasi, koneksi PostgreSQL/skema dan SMTP bila diisi. |
 | `npm run typecheck` dan `npm test` | Hasilkan tipe route Next.js, periksa TypeScript, dan jalankan tes unit. |
 | `npm run test:integration` | Uji aplikasi lokal dengan PGlite dan SMTP palsu. Sisakan port loopback 3000, 25433, dan 25434. |
 | `MADEVI_TEST_BUILD=1 npm run test:integration` | Jalankan build dalam konfigurasi uji staging, lalu uji aplikasi. |
@@ -73,12 +76,13 @@ Aplikasi memakai Node.js 24, Next.js App Router, React, TypeScript, PostgreSQL m
 
 Untuk langkah lengkap dan solusi masalah setup, lihat [panduan lokal](docs/lokal.md). Mulai dari [indeks dokumentasi](docs/README.md), lalu baca [fondasi proyek](docs/fundamental.md), [persiapan online](docs/online.md) atau [laporan verifikasi penataan](docs/laporan-penataan.md).
 
-## Madevi V0.0.0.18 — Update terbaru
+## Madevi V0.0.0.19 — Update terbaru
 
-Pembaruan ini merapikan fondasi proyek, menambahkan galeri screenshot dari aplikasi lokal, dan melengkapi panduan setup, persiapan online, serta perpindahan layanan.
+Pembaruan ini menyiapkan jalur aktivasi default, mengikat akses admin ke MFA per sesi, memperbaiki pembatasan request dan foto pendaftaran, serta memperluas pengujian. [Bukti verifikasi](docs/laporan-kesiapan.md)
 
 Pembaruan utama (major) berikut dipilih berdasarkan dampaknya pada fondasi dan alur pengguna. Kategori ini untuk penyajian riwayat. Nomor versi Madevi tetap memakai empat bagian dan angka terakhir bertambah satu tiap rilis.
 
+- **V0.0.0.19** — Kesiapan aktivasi, MFA per sesi, dan pemisahan kuota.
 - **V0.0.0.18** — Penataan fondasi, galeri aplikasi, dan panduan operasional.
 - **V0.0.0.17** — Penguatan alur profil dan bukti pengujian lokal.
 - **V0.0.0.13** — Tata letak Default untuk beranda, sidebar, profil, dan dashboard admin.

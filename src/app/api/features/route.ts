@@ -1,3 +1,9 @@
 import { NextResponse } from "next/server";
-export function GET(){return NextResponse.json({google:Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)},{headers:{"Cache-Control":"no-store"}})}
+import { googleSettings, smtpSettings } from "@/lib/env";
 
+export function GET() {
+  return NextResponse.json({
+    google: Boolean(googleSettings()),
+    email: Boolean(smtpSettings()),
+  }, { headers: { "Cache-Control": "no-store" } });
+}

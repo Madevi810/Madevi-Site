@@ -1,6 +1,12 @@
 # Perubahan Madevi
 
-Nomor rilis Madevi terdiri dari empat bagian. Angka terakhir naik satu tingkat pada tiap rilis sesuai keputusan proyek. Manifest npm memakai representasi valid seperti `0.0.0-18`. Pilihan pembaruan utama di README mengikuti dampak, tanpa semantik tambahan pada angka versi.
+Nomor rilis Madevi terdiri dari empat bagian. Angka terakhir naik satu tingkat pada tiap rilis sesuai keputusan proyek. Manifest npm memakai representasi valid seperti `0.0.0-19`. Pilihan pembaruan utama di README mengikuti dampak, tanpa semantik tambahan pada angka versi.
+
+## v0.0.0.19 — kesiapan aktivasi dan penguatan keamanan
+
+- Tambahkan `check:ready`, spesifikasi aktivasi default dan panduan penyerahan dengan satu admin.
+- Ikat akses pengelola ke MFA sesi, batasi Google untuk pengguna biasa, pisahkan kuota request, dan perbaiki pengiriman foto pendaftaran.
+- Tambahkan pengujian browser, smoke runtime, dan role PostgreSQL terpisah pada CI.
 
 ## v0.0.0.18 — penataan fondasi, galeri, dan panduan operasional
 

@@ -1,4 +1,6 @@
-# Persiapan mengaktifkan Madevi secara online
+# Pilihan tambahan untuk menjalankan Madevi online
+
+Untuk jalur utama Compose, PostgreSQL dan Caddy, gunakan [aktivasi default](aktivasi-default.md). Contoh berikut membandingkan opsi penyedia.
 
 Mulai dari staging, yaitu situs uji terpisah dengan data sintetis dan akses terbatas. Lingkungan development berjalan di komputer, staging memakai origin HTTPS dan konfigurasi sendiri, sedangkan production dipakai pengguna nyata setelah pemeriksaan lulus. Siapkan database, origin, akun, dan secret berbeda untuk setiap lingkungan. [Mode lingkungan](../ops/environments.md), [jalankan lokal](lokal.md)
 
@@ -54,7 +56,7 @@ Gunakan [langkah setiap layanan](siapkan-layanan.md) untuk menyiapkan dashboard,
 | `BETTER_AUTH_URL` | Origin HTTPS dari Render atau domain yang telah dipasang. Isi skema dan host persis, tanpa path, query maupun kredensial. |
 | `BETTER_AUTH_SECRET` | Buat nilai acak minimal 32 karakter untuk setiap lingkungan dan simpan di secret manager. Mengubahnya memerlukan peninjauan dampak sesi. |
 | `MADEVI_ENV`, `MADEVI_DEMO_MODE` | Isi `staging` atau `production`, dan selalu `false` untuk demo. Compose utama mengatur mode production. Untuk staging di VPS gunakan konfigurasi Compose privat yang mengganti mode dan memakai env file staging. |
-| `MEDIA_BACKEND`, `TRUST_PROXY_HEADERS` | Gunakan `postgres` dan `false`. Aktifkan trust hanya setelah origin tidak bisa dilewati dan proxy tepercaya menimpa `X-Real-IP`. |
+| `MEDIA_BACKEND`, `TRUST_PROXY_HEADERS` | Gunakan `postgres`. Untuk proxy default, aktifkan trust setelah origin tertutup dan proxy menimpa IP serta token berbasis `MADEVI_PROXY_SECRET`. [Contoh proxy](../ops/reverse-proxy.example.md) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Isi kelimanya dari pengaturan provider. Contoh Postmark transaksional memakai `smtp.postmarkapp.com` dan port `2525`, access key dan secret dari SMTP Token, serta pengirim/domain terverifikasi. Aktifkan akses SMTP di provider dan uji STARTTLS/delivery dari host. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Buat OAuth client jenis Web application dan konfigurasi consent/test user di Google Cloud. Masukkan redirect URI persis `https://<host>/api/auth/callback/google`. Isi kedua nilai bila digunakan. |
 | `OWNER_USERNAME`, `OWNER_EMAIL`, `OWNER_PASSWORD` | Identitas pemilik pertama dan kata sandi unik minimal 12 karakter. Sediakan hanya pada proses bootstrap dan hapus dari environment proses sesudahnya. |
@@ -95,14 +97,14 @@ Jalankan perintah berikut dari root checkout yang berisi `package.json` dan `com
 1. Pastikan commit, lingkungan dan database benar. Untuk database yang sudah berisi data, ambil backup dan uji kompatibilitas aplikasi lama/baru sebelum perubahan skema.
 2. Pada Render/Neon, pakai checkout commit yang sama dan Node 24 pada mesin yang diberi akses DB. Setelah `npm ci`, simpan nilai staging dan URI role migrasi dalam file privat di luar repo, misalnya `/lokasi-privat/madevi-staging.env`. Jalankan `node --env-file=/lokasi-privat/madevi-staging.env scripts/migrate.mjs`. Berbeda dengan file Compose, file ini harus diberikan melalui flag tersebut. Pakai terminal tanpa nilai database/origin lain yang sudah diekspor, karena nilai tereskpor mendapat prioritas.
 3. Pada VPS dengan konfigurasi production Compose, siapkan image dengan `docker compose build madevi`. Jalankan `docker compose run --rm madevi npm run db:migrate` dengan kredensial migrasi tersedia melalui mekanisme env privat untuk job satu kali. Jika kredensial dipisah, muat URI role migrasi ke environment shell privat dan jalankan job dengan `docker compose run --rm -e DATABASE_URL madevi npm run db:migrate`. Env file aplikasi tetap memakai role runtime. Uji akses role runtime setelah migrasi.
-4. Pastikan runner sukses serta kedua versi tercatat. Jangan menulis ulang SQL yang checksum-nya sudah tersimpan. CI punya uji rollback di database sintetis. Untuk lingkungan berdata, pilih migrasi perbaikan atau pemulihan yang ditinjau. [Panduan database](../database/README.md)
+4. Pastikan runner sukses serta semua versi pada daftar migrasi tercatat. Jangan menulis ulang SQL yang checksum-nya sudah tersimpan. CI punya uji rollback di database sintetis. Untuk lingkungan berdata, pilih migrasi perbaikan atau pemulihan yang ditinjau. [Panduan database](../database/README.md)
 
 ## 4. Jalankan aplikasi dan periksa layanan
 
 Gunakan [checklist sebelum online](../ops/deploy-checklist.md#sebelum-online) sebelum menjalankan deployment. Gunakan alur ini saat Anda sudah memilih host dan menyetujui aktivasi.
 
 1. Render menjalankan `npm start` dari image. Di VPS start dengan `docker compose up -d madevi` sesudah migrasi dan siapkan Caddy/TLS. Untuk build manual tanpa container, `npm run build` lalu `npm start` memakai konfigurasi valid dengan mode staging/production dan origin HTTPS. Placeholder pada Dockerfile hanya digunakan ketika build.
-2. Pastikan `/api/health/live` dan `/api/health/ready` memberi 200 pada origin HTTPS. Readiness menguji koneksi dan migrasi kedua. Setel health path web service ke `/api/health/ready`. Periksa redirect HTTPS, host/origin, cookie sesi dan akses origin.
+2. Pastikan `/api/health/live` dan `/api/health/ready` memberi 200 pada origin HTTPS. Readiness menguji koneksi, skema migrasi dan bukti MFA. Setel health path web service ke `/api/health/ready`. Periksa redirect HTTPS, host/origin, cookie sesi dan akses origin.
 3. Di staging, periksa header dan pembatasan upload. Amati log tanpa password, token, URI database maupun isi pesan privat. Konfigurasikan alarm untuk kesiapan, HTTP 5xx, koneksi DB, penyimpanan dan kegagalan backup. Tetapkan penerima, ambang, retensi, dan anggaran. Workflow GitHub saat ini memverifikasi kode dan database uji. Sambungkan deployment terkontrol setelah staging lulus serta pisahkan hak CI dari kredensial produksi. [Health check Render](https://render.com/docs/health-checks), [panduan operasi](../ops/operations.md)
 
 ## 5. Buat admin dan uji alur

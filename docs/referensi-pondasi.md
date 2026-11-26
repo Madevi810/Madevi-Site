@@ -2,7 +2,7 @@
 
 Sumbernya adalah ZIP `Pondasi-Madevi-Referensi-v0.0.0.13.zip` yang diberikan pemilik. `BACA-REFERENSI.md` menyebut asal `Project-Madevi-v0.0.0.13.zip`. Hash SHA-256 seluruh 208 berkas Pondasi cocok dengan inventaris. Bagian yang berawalan angka di tabel berada di dalam `Pondasi/Foundation/` pada arsip. Panduan aktif mengikuti repositori Madevi-Site dan keputusan pemilik terkini.
 
-Ada tiga penanda versi dengan konteks berbeda. `Pondasi/README.md` menyebut v0.0.0.4, manifest historis mencatat implementasi saat itu v0.0.0.13 dan `mew_version: 2.1.0` untuk kerangka perencanaan MEW. Aplikasi saat ini menampilkan v0.0.0.18. Catatan awal D-003 membatasi pekerjaan pada diskusi dan melarang implementasi saat itu. Persetujuan tahap pertama dan manifest sumber kemudian mencatat implementasi telah disetujui. Instruksi agent dan gerbang arsip menyimpan konteks periode tersebut. Panduan kerja aktif tersedia di [AGENTS.md](../AGENTS.md).
+Ada tiga penanda versi dengan konteks berbeda. `Pondasi/README.md` menyebut v0.0.0.4, manifest historis mencatat implementasi saat itu v0.0.0.13 dan `mew_version: 2.1.0` untuk kerangka perencanaan MEW. Aplikasi saat ini menampilkan v0.0.0.19. Catatan awal D-003 membatasi pekerjaan pada diskusi dan melarang implementasi saat itu. Persetujuan tahap pertama dan manifest sumber kemudian mencatat implementasi telah disetujui. Instruksi agent dan gerbang arsip menyimpan konteks periode tersebut. Panduan kerja aktif tersedia di [AGENTS.md](../AGENTS.md).
 
 | Bagian referensi | Relevansi sekarang | Rujukan dalam repo | Yang perlu dilengkapi atau sudah digantikan |
 | --- | --- | --- | --- |
