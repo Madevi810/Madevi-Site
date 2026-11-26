@@ -10,10 +10,11 @@ export async function GET(request:Request){
   if(!parsed.success)return NextResponse.json({error:"Parameter notifikasi tidak valid."},{status:400,headers:{"Cache-Control":"no-store"}});
   try{
     const account=await currentAccount();const id=account?.row.id||null;const {category,limit,after}=parsed.data;
-    const {rows}=await pool.query(`SELECT n.id,n.category,n.title,n.body,n.created_at,
+    const {rows}=await pool.query(`SELECT n.id,n.category,n.title,n.body,n.created_at,j.media_id,
       to_char(n.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_time,
       (r.read_at IS NOT NULL) AS is_read
       FROM madevi_notifications n LEFT JOIN madevi_notification_reads r ON r.notification_id=n.id AND r.user_id=$1
+      LEFT JOIN madevi_message_jobs j ON j.id=n.job_id
       WHERE (n.category='general' OR (n.recipient_id=$1 AND n.category IN ('system','social')))
       AND ($2::text IS NULL OR n.category=$2)
       AND ($3::timestamptz IS NULL OR (n.created_at,n.id)<($3::timestamptz,$4::uuid))

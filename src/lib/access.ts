@@ -1,4 +1,5 @@
 import "server-only";
+import { accountRestricted } from "./account-status";
 import { headers } from "next/headers";
 import { auth } from "./auth-config";
 import { pool } from "./db";
@@ -10,7 +11,7 @@ export async function currentAuthenticationAccount() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
   const result = await pool.query(
-    `SELECT u.id, u."madeviRole", u.suspended, u."isDemo", u."twoFactorEnabled", u.username, s."madeviMfa"
+    `SELECT u.id, u."madeviRole", (${accountRestricted}) AS suspended, u."isDemo", u."twoFactorEnabled", u.username, s."madeviMfa"
      FROM "user" u JOIN "session" s ON s."userId" = u.id WHERE u.id = $1 AND s.id = $2`,
     [session.user.id, session.session.id],
   );

@@ -14,13 +14,13 @@ Madevi adalah platform web edukasi dan layanan digital. Pengunjung dapat menemuk
 
 Kepemilikan proyek saat ini berada pada satu pemilik dengan satu admin pengendali. Akun pengguna mengikuti pendaftaran website. Panduan [aktivasi default](docs/aktivasi-default.md) adalah titik mulai saat ingin menyiapkan layanan.
 
-Explore & Learn dan Tutorial & Problem Solve menjadi prioritas pengembangan konten. Saat ini ketujuh halaman ruang tersedia sebagai kerangka dan taksonomi serta konten asli belum diisi. Alur bersama mencakup pencarian judul, halaman baca teks terbit, pengelolaan draf dan publikasi, profil dan avatar, notifikasi umum dan sistem, pelaporan, serta panel admin dengan MFA.
+Explore & Learn dan Tutorial & Problem Solve menjadi prioritas pengembangan konten. Ketujuh halaman ruang menampilkan konten terbit dengan pencarian, filter dan halaman lanjutan. Konten asli dan taksonomi final masih menunggu penyusunan. Panel admin dengan MFA mengelola draf, revisi, publikasi, pustaka gambar, halaman informasi, akun, notifikasi dan laporan. Dashboard membaca data aplikasi dan riwayat pekerjaan. [Panduan panel admin](docs/admin.md)
 
-Pendaftaran, verifikasi, perubahan email, dan pemulihan kata sandi memerlukan SMTP. Google OAuth memiliki konfigurasi opsional dan masih memerlukan uji penyedia. Halaman kebijakan, bantuan, fitur simpan, dan ikon sosial developer masih berupa penanda. Modul khusus lima ruang lainnya masih direncanakan. Status proyek adalah **pengembangan lokal, belum siap menerima pengguna nyata**.
+Pendaftaran, verifikasi, perubahan email, dan pemulihan kata sandi memerlukan SMTP. Google OAuth memiliki konfigurasi opsional dan masih memerlukan uji penyedia. Halaman kebijakan dan bantuan dikelola dari admin dan masih perlu diisi. Fitur simpan dan tautan sosial masih menunggu pengembangan. Modul khusus lima ruang lainnya masih direncanakan. Status proyek adalah **pengembangan lokal, belum siap menerima pengguna nyata**.
 
 ## Cuplikan aplikasi lokal
 
-Cuplikan diambil dari build pengembangan lokal Madevi V0.0.0.19. Profil dan admin memakai akun demo sintetis. [Cara mengambil ulang galeri](docs/screenshot.md)
+Cuplikan diambil dari aplikasi Madevi V0.0.0.20 yang dijalankan secara lokal dengan data PostgreSQL sintetis. Profil memakai akun demo. Admin memakai akun uji yang menyelesaikan MFA. [Cara mengambil ulang galeri](docs/screenshot.md)
 
 <table>
   <tr>
@@ -37,7 +37,7 @@ Cuplikan diambil dari build pengembangan lokal Madevi V0.0.0.19. Profil dan admi
   <tr>
     <td><a href="docs/screenshots/sidebar.png"><img src="docs/screenshots/sidebar.png" alt="Sidebar Madevi terbuka dengan navigasi tujuh ruang" width="270"></a></td>
     <td><a href="docs/screenshots/profil.png"><img src="docs/screenshots/profil.png" alt="Tab Status pada profil pengguna demo Madevi" width="270"></a></td>
-    <td><a href="docs/screenshots/admin.png"><img src="docs/screenshots/admin.png" alt="Dashboard admin demo Madevi dengan kartu pengelolaan" width="270"></a></td>
+    <td><a href="docs/screenshots/admin.png"><img src="docs/screenshots/admin.png" alt="Dashboard admin Madevi dengan sidebar dan ringkasan dari database uji" width="270"></a></td>
   </tr>
   <tr>
     <td>Sidebar</td>
@@ -70,18 +70,21 @@ Aplikasi memakai Node.js 24, Next.js App Router, React, TypeScript, PostgreSQL m
 | --- | --- |
 | `npm run check:ready` | Validasi konfigurasi, koneksi PostgreSQL/skema dan SMTP bila diisi. |
 | `npm run typecheck` dan `npm test` | Hasilkan tipe route Next.js, periksa TypeScript, dan jalankan tes unit. |
-| `npm run test:integration` | Uji aplikasi lokal dengan PGlite dan SMTP palsu. Sisakan port loopback 3000, 25433, dan 25434. |
+| `npm run test:integration` | Uji aplikasi dan SMTP palsu. Gunakan `MADEVI_TEST_DATABASE_URL` ke PostgreSQL lokal terisolasi bernama `madevi_ci_*` untuk tes konkurensi dan kerja admin. Sisakan port loopback 3000 dan 25434. |
 | `MADEVI_TEST_BUILD=1 npm run test:integration` | Jalankan build dalam konfigurasi uji staging, lalu uji aplikasi. |
+| `npm run jobs:dispatch` | Proses notifikasi terjadwal yang jatuh tempo melalui worker host. |
+| `npm run db:backup:encrypted` | Buat cadangan setelah direktori, kunci dan alat PostgreSQL siap. [Prosedur](ops/backup-restore.md) |
 | `npm run build` dan `npm start` | Build dan start Node.js dengan konfigurasi staging/produksi yang valid. |
 
 Untuk langkah lengkap dan solusi masalah setup, lihat [panduan lokal](docs/lokal.md). Mulai dari [indeks dokumentasi](docs/README.md), lalu baca [fondasi proyek](docs/fundamental.md), [persiapan online](docs/online.md) atau [laporan verifikasi penataan](docs/laporan-penataan.md).
 
-## Madevi V0.0.0.19 — Update terbaru
+## Madevi V0.0.0.20 — Update terbaru
 
-Pembaruan ini menyiapkan jalur aktivasi default, mengikat akses admin ke MFA per sesi, memperbaiki pembatasan request dan foto pendaftaran, serta memperluas pengujian. [Bukti verifikasi](docs/laporan-kesiapan.md)
+Pembaruan ini menghubungkan tujuh ruang dengan konten terbit, melengkapi panel admin, serta menambahkan pesan terjadwal dan pemulihan database dari backup terenkripsi. [Bukti verifikasi](docs/laporan-fondasi-admin.md)
 
 Pembaruan utama (major) berikut dipilih berdasarkan dampaknya pada fondasi dan alur pengguna. Kategori ini untuk penyajian riwayat. Nomor versi Madevi tetap memakai empat bagian dan angka terakhir bertambah satu tiap rilis.
 
+- **V0.0.0.20** — Fondasi tujuh ruang, panel admin, pesan terjadwal, dan backup terenkripsi.
 - **V0.0.0.19** — Kesiapan aktivasi, MFA per sesi, dan pemisahan kuota.
 - **V0.0.0.18** — Penataan fondasi, galeri aplikasi, dan panduan operasional.
 - **V0.0.0.17** — Penguatan alur profil dan bukti pengujian lokal.

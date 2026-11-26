@@ -11,7 +11,10 @@ try {
   await client.query("SELECT pg_advisory_xact_lock(7412301)");
   const owner = await client.query('SELECT 1 FROM "user" WHERE "madeviRole"=\'admin\' AND NOT "isDemo"');
   if (owner.rowCount) throw new Error("Gunakan database demo terpisah dari database yang memiliki admin pemilik.");
-  for (const [display, role] of [["Madevi-Admin", "admin"], ["Madevi-User", "user"]]) {
+  const accounts = process.argv.includes("--user-only")
+    ? [["Madevi-User","user"]]
+    : [["Madevi-Admin","admin"],["Madevi-User","user"]];
+  for (const [display, role] of accounts) {
     const normalized = display.toLowerCase();
     const exists = await client.query('SELECT id, "isDemo" FROM "user" WHERE username=$1', [normalized]);
     if (exists.rowCount) { if (!exists.rows[0].isDemo) throw new Error("Username sudah digunakan akun non-demo"); continue; }

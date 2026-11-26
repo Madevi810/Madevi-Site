@@ -1,0 +1,17 @@
+DROP TABLE IF EXISTS madevi_worker_status;
+DROP TABLE IF EXISTS madevi_operations;
+ALTER TABLE madevi_reports DROP COLUMN IF EXISTS automatic_response;
+DROP TABLE IF EXISTS madevi_support_rules;
+ALTER TABLE madevi_notifications DROP COLUMN IF EXISTS job_id;
+DROP TABLE IF EXISTS madevi_message_jobs;
+DROP TABLE IF EXISTS madevi_message_templates;
+DROP TABLE IF EXISTS madevi_revision_files;
+DROP TABLE IF EXISTS madevi_library;
+DROP TABLE IF EXISTS madevi_website_settings;
+DROP TABLE IF EXISTS madevi_information_pages;
+DROP TABLE IF EXISTS madevi_report_events;
+ALTER TABLE madevi_reports DROP COLUMN IF EXISTS priority;
+DROP INDEX IF EXISTS madevi_audit_recent_idx;
+ALTER TABLE madevi_audit DROP COLUMN IF EXISTS outcome, DROP COLUMN IF EXISTS reason;
+ALTER TABLE "user" DROP CONSTRAINT IF EXISTS madevi_timed_restriction;
+ALTER TABLE "user" DROP COLUMN IF EXISTS restricted_until, DROP COLUMN IF EXISTS restriction;

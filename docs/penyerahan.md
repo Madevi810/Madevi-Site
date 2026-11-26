@@ -23,3 +23,7 @@ Rencanakan penghentian sesi lama. Perubahan `BETTER_AUTH_SECRET` memengaruhi coo
 ## 4. Verifikasi dan cabut akses lama
 
 Uji backup/restore, readiness, TLS, akun, media, SMTP dan Google bila digunakan, serta alarm. Catat waktu dan SHA rilis. Setelah trafik stabil, cabut akses pemilik/operator lama ke GitHub, SSH, penyedia, DNS, database, pengelola secret, integrasi CI, monitoring dan backup sesuai kesepakatan. Periksa deploy key dan akses yang pernah diberikan pada vendor. Pemilik baru memegang satu jalur pemulihan yang telah diuji. Data dan layanan lama dipertahankan, diarsipkan, atau dihapus setelah keputusan pemilik dan validasi masa pemulihan.
+
+## Uji kendali panel setelah penyerahan
+
+Pemilik baru memeriksa panel dengan sesi MFA baru. Periksa akun utama tetap satu, uji akses laporan dan lampiran privat, publikasikan draf pengujian lalu arsipkan, dan uji pengiriman internal. Alihkan jadwal worker dan backup bersama identitas host. Gunakan rollout dan target restore yang terpisah. Kunci cadangan lama hanya ikut diserahkan bila artefak dan datanya termasuk dalam kesepakatan. Buat kunci baru untuk cadangan berikutnya dan catat akses yang dicabut. [Panduan admin](admin.md) · [Prosedur pemulihan](../ops/backup-restore.md)

@@ -41,16 +41,9 @@ jobs:
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: bash scripts/test-db-roles.sh
-      - name: Backup and restore isolated CI database
+      - name: Verify encrypted backup and restore
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
-        run: |
-          docker exec "$PG_CONTAINER" pg_dump -U madevi_test -Fc -f /tmp/madevi-ci.dump madevi_ci_test
-          docker exec "$PG_CONTAINER" createdb -U madevi_test madevi_ci_restore
-          docker exec "$PG_CONTAINER" pg_restore -U madevi_test --exit-on-error -d madevi_ci_restore /tmp/madevi-ci.dump
-          query="SELECT version, checksum FROM madevi_schema_migrations ORDER BY version"
-          source=$(docker exec "$PG_CONTAINER" psql -U madevi_test -d madevi_ci_test -tAc "$query")
-          restored=$(docker exec "$PG_CONTAINER" psql -U madevi_test -d madevi_ci_restore -tAc "$query")
-          test -n "$source"
-          test "$source" = "$restored"
+          MADEVI_TEST_DATABASE_URL: postgresql://madevi_test:local-test-only@127.0.0.1:25435/madevi_ci_test
+        run: bash scripts/test-encrypted-backup.sh
       - run: npm audit --omit=dev --audit-level=high

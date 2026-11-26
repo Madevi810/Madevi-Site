@@ -1,5 +1,5 @@
 import { writeSync } from "node:fs";
-import { authOrigin, configurationIssues, databaseUrl, googleSettings, smtpSettings } from "../src/lib/env.ts";
+import { authOrigin, backupSettings, configurationIssues, databaseUrl, googleSettings, smtpSettings } from "../src/lib/env.ts";
 import { createSmtpTransport } from "../src/lib/mail.ts";
 import { createDatabasePool } from "../src/lib/postgres.ts";
 import { checkDatabaseReadiness } from "../src/lib/readiness.ts";
@@ -40,6 +40,9 @@ if (issues.length) {
     }
   }
 
+  console.log(backupSettings()
+    ? "Backup: konfigurasi dasar tersedia. Verifikasi izin host dan restore sebelum mengandalkannya."
+    : "Backup: konfigurasi belum diisi pada proses ini; periksa host operasi.");
   console.log(googleSettings()
     ? "Google: konfigurasi tersedia. Uji callback dan login pengguna diperlukan."
     : "Google: belum diisi (opsional).");

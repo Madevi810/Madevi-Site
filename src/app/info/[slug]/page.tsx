@@ -1,4 +1,12 @@
 import { notFound } from "next/navigation";
-import { PublicShell } from "@/components/public-shell";
-import { informationPages } from "@/lib/info-pages";
-export default async function Page({params}:{params:Promise<{slug:string}>}){const {slug}=await params;const info=informationPages[slug as keyof typeof informationPages];if(!info)notFound();return <PublicShell page="content" contentTitle={info.title} paragraphs={[info.body]}/>}
+import { PublicPage } from "@/components/public-page";
+import { readInformation } from "@/lib/site-config";
+export const dynamic="force-dynamic";
+export default async function Page({params}:{params:Promise<{slug:string}>}){
+  const {slug}=await params;
+  const pages=await readInformation().catch(()=>null);
+  if(!pages) return <PublicPage page="content" contentTitle="Informasi" section={<p role="alert">Informasi sementara tidak tersedia.</p>}/>;
+  const info=pages.find(page=>page.slug===slug && page.visible);
+  if(!info)notFound();
+  return <PublicPage page="content" contentTitle={info.title} section={<p className="whitespace-pre-wrap">{info.body}</p>}/>;
+}

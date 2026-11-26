@@ -1,24 +1,18 @@
 # Memperbarui screenshot README
 
-Galeri merekam aplikasi Madevi yang benar-benar dijalankan di komputer lokal. Screenshot beranda bersifat publik. Sidebar dibuka lewat tombol Menu. Profil dan dashboard diambil setelah masuk melalui formulir dengan akun demo sintetis pada database PGlite sementara. PGlite menjalankan mesin PostgreSQL ringan di proses lokal untuk pengujian.
+Galeri merekam aplikasi Madevi yang benar-benar dijalankan di komputer lokal. Profil memakai akun demo sintetis. Dashboard memakai admin sintetis dengan MFA pada PostgreSQL uji.
 
 ## Prasyarat dan perintah
 
 1. Buka terminal di **root Madevi-Site** yang berisi `package.json`. Siapkan Node.js 24 dan jalankan `npm ci --no-audit --no-fund`.
-2. Pasang browser yang cocok dengan Playwright dengan `npx playwright install chromium`. Untuk Linux yang belum memiliki pustaka sistem browser, ikuti petunjuk instalasi Playwright untuk distribusi dan hak akses komputer. Chromium lokal yang sudah terpasang dapat dipilih melalui `MADEVI_CHROMIUM_PATH`. [Instalasi browser Playwright](https://playwright.dev/docs/browsers)
-3. Jalankan satu perintah untuk mengambil ulang semua gambar:
+2. Pasang browser dengan `npx playwright install chromium`. Chromium sistem dapat dipilih dengan `MADEVI_CHROMIUM_PATH`. [Instalasi browser Playwright](https://playwright.dev/docs/browsers)
+3. Buat database PostgreSQL lokal **baru dan kosong** bernama `madevi_ci_screenshots` atau `madevi_ci_screenshots_<id>`. Role pengujian memerlukan hak untuk membuat skema. Buat database baru untuk pengambilan berikutnya. Masukkan URI role sintetis melalui environment privat. Contoh di bawah hanya memakai placeholder.
 
 ```bash
-npm run screenshots
+MADEVI_TEST_DATABASE_URL='postgresql://ROLE:PASSWORD@127.0.0.1:5432/madevi_ci_screenshots' npm run screenshots
 ```
 
-Contoh bila memakai Chromium sistem di Linux:
-
-```bash
-MADEVI_CHROMIUM_PATH=/usr/bin/chromium npm run screenshots
-```
-
-Perintah menggunakan port loopback dinamis untuk aplikasi dan database. Salinan sementara dibuat tanpa `.env.local` atau kredensial layanan dari shell, lalu dibersihkan saat proses berakhir normal atau gagal. Setelan preview menyembunyikan indikator dev Next.js. Browser baru memakai tema terang, bahasa Indonesia, reduced motion, zona waktu Asia/Jakarta, dan viewport (area halaman yang terlihat) 1440×900 untuk desktop atau 390×844 untuk ponsel. Pengambilan gambar menunggu font dan gambar siap. Pengaturan ini berlaku pada sesi screenshot.
+Skrip menjalankan aplikasi asli dari checkout pada port loopback dinamis. Ia memeriksa database uji, menjalankan migrasi dan membuat akun sintetis. Admin login dengan password lalu menyelesaikan aktivasi autentikator melalui UI. Browser baru memakai tema terang, bahasa Indonesia, reduced motion, zona waktu Asia/Jakarta, dan viewport 1440×900 untuk desktop atau 390×844 untuk ponsel. Pengambilan menunggu font dan gambar siap. Masa berlaku konfigurasi uji terbatas pada proses screenshot. Database uji dapat dibersihkan setelah bukti diperiksa.
 
 ## Hasil dan pemeriksaan visual
 
@@ -28,7 +22,7 @@ Perintah menggunakan port loopback dinamis untuk aplikasi dan database. Salinan 
 | `beranda-ponsel.png` | Header serta hero dan awal daftar ruang pada viewport ponsel. |
 | `sidebar.png` | Sidebar menu terbuka dengan navigasi ruang dan kartu developer. |
 | `profil.png` | Tab Status setelah login sebagai Madevi-User. |
-| `admin.png` | Dashboard setelah login sebagai Madevi-Admin pada lingkungan demo. |
+| `admin.png` | Dashboard setelah login sebagai Madevi-Admin dengan MFA pada lingkungan pengujian. |
 
 Buka kelimanya pada resolusi asli. Periksa bahwa isi sesuai judul, ukuran masuk akal, teks terbaca, gambar dan font tampil, serta tidak ada dialog kesalahan, data nyata, password atau kode pemulihan. Lihat preview [README](../README.md#cuplikan-aplikasi-lokal) dan jalankan `git status --short` untuk melihat gambar yang diperbarui. Jika UI berubah, simpan screenshot yang terdampak dan sesuaikan konteks sumber pada keterangan README saat diperlukan.
 

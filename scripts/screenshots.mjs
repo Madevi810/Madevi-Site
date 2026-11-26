@@ -1,16 +1,15 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { once } from "node:events";
-import { copyFile, cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer as createSocket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
-import { PGlite } from "@electric-sql/pglite";
 import { chromium } from "playwright";
-import { createServer as serveDatabase } from "pglite-server";
+import { Pool } from "pg";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const loopback = "127.0.0.1";
@@ -22,23 +21,6 @@ async function listen(server) {
   server.listen(0, loopback);
   await once(server, "listening");
   return server.address().port;
-}
-
-async function preparePreview(directory) {
-  for (const path of ["src", "public", "package.json", "package-lock.json", "tsconfig.json", "postcss.config.mjs"]) {
-    await cp(join(root, path), join(directory, path), { recursive: true });
-  }
-  await mkdir(join(directory, "scripts"));
-  for (const path of ["migrate.mjs", "seed-demo.mjs", "migrations"]) {
-    await cp(join(root, "scripts", path), join(directory, "scripts", path), { recursive: true });
-  }
-  await symlink(join(root, "node_modules"), join(directory, "node_modules"), "junction");
-  await copyFile(join(root, "next.config.ts"), join(directory, "next.config.source.ts"));
-  await writeFile(join(directory, "next.config.ts"), [
-    'import config from "./next.config.source";',
-    "export default { ...config, devIndicators: false };",
-    "",
-  ].join("\n"));
 }
 
 function start(args, directory, env) {
@@ -99,36 +81,58 @@ async function signIn(page, username, password) {
   assert.equal((await login).status(), 200, `Login lokal gagal untuk ${username}`);
 }
 
+function authenticatorCode(secret) {
+  const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bits=[...secret].map(char=>alphabet.indexOf(char).toString(2).padStart(5,"0")).join("");
+  const key=Buffer.from(bits.match(/.{8}/g).map(byte=>parseInt(byte,2)));
+  const counter=Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
+  const digest=createHmac("sha1",key).update(counter).digest();
+  return String((digest.readUInt32BE(digest.at(-1)&15)&0x7fffffff)%1000000).padStart(6,"0");
+}
+
+const url = new URL(process.env.MADEVI_TEST_DATABASE_URL ?? "postgresql://localhost/");
+if (!["postgres:","postgresql:"].includes(url.protocol) || !["127.0.0.1","localhost","[::1]"].includes(url.hostname) || !/^\/madevi_ci_screenshots(?:_[a-z0-9_]+)?$/.test(url.pathname) || url.search || url.hash) {
+  throw new Error("Setel MADEVI_TEST_DATABASE_URL ke database PostgreSQL loopback kosong bernama madevi_ci_screenshots.");
+}
+const isolated = new Pool({connectionString:url.toString(),connectionTimeoutMillis:5000});
+try {
+  const {rows} = await isolated.query("SELECT current_database() AS name, EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON c.relnamespace=n.oid WHERE n.nspname='public') AS occupied");
+  if (rows[0].occupied || rows[0].name !== url.pathname.slice(1)) throw new Error("Gunakan database screenshot baru dan kosong.");
+} finally { await isolated.end(); }
 const directory = await mkdtemp(join(tmpdir(), "madevi-screenshots-"));
-const db = new PGlite();
-const database = serveDatabase(db, { logLevel: 0 });
 let app, browser;
 try {
-  await preparePreview(directory);
-  await db.waitReady;
-  const dbPort = await listen(database);
   const socket = createSocket();
   const appPort = await listen(socket);
   await new Promise(resolve => socket.close(resolve));
   const origin = `http://${loopback}:${appPort}`;
   const password = randomBytes(24).toString("hex");
-  // The preview has no dotenv files and ignores service settings in the caller's shell.
+  // Override every service setting so the original Next application connects only to the test database.
   const env = Object.fromEntries(Object.entries(process.env)
     .filter(([key]) => /^(PATH|SYSTEMROOT|WINDIR|COMSPEC|TEMP|TMP|TMPDIR)$/i.test(key)));
   Object.assign(env, {
-    DATABASE_URL: `postgresql://postgres@127.0.0.1:${dbPort}/postgres`,
+    DATABASE_URL: url.toString(),
+    SMTP_HOST:"", SMTP_PORT:"", SMTP_USER:"", SMTP_PASS:"", MAIL_FROM:"",
+    GOOGLE_CLIENT_ID:"", GOOGLE_CLIENT_SECRET:"", MADEVI_PROXY_SECRET:"", MEDIA_BACKEND:"postgres",
+    MADEVI_BACKUP_DIR:"", MADEVI_BACKUP_KEY:"",
+    MADEVI_QA_HIDE_DEV_INDICATOR:"1",
     BETTER_AUTH_URL: origin,
     BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
     DEMO_PASSWORD: password,
+    OWNER_USERNAME:"Madevi-Admin",
+    OWNER_EMAIL:"madevi-admin@example.invalid",
+    OWNER_PASSWORD:password,
     NODE_ENV: "development",
     MADEVI_ENV: "dev",
     MADEVI_DEMO_MODE: "true",
     TRUST_PROXY_HEADERS: "false",
     NEXT_TELEMETRY_DISABLED: "1",
   });
-  await run(["scripts/migrate.mjs"], directory, env);
-  await run(["scripts/seed-demo.mjs"], directory, env);
-  app = start(["node_modules/next/dist/bin/next", "dev", "--webpack", "--hostname", loopback, "--port", String(appPort)], directory, env);
+  await run(["scripts/migrate.mjs"], root, env);
+  await run(["scripts/seed-demo.mjs","--user-only"], root, env);
+  await run(["scripts/create-owner.mjs"], root, env);
+  app = start(["node_modules/next/dist/bin/next", "dev", "--webpack", "--hostname", loopback, "--port", String(appPort)], root, env);
   await waitForApp(origin, app);
 
   browser = await chromium.launch({ executablePath: process.env.MADEVI_CHROMIUM_PATH || undefined });
@@ -151,11 +155,22 @@ try {
   await desktop.getByRole("heading", { name: "Madevi-User", exact: true }).waitFor();
   await desktop.getByText("@madevi-user", { exact: true }).waitFor();
   await capture(desktop, directory, imageNames[3]);
+  await desktop.getByRole("button",{name:"Buka pesan",exact:true}).click();
+  await desktop.getByRole("tab",{name:"Sistem",exact:true,selected:true}).waitFor();
 
   const admin = await openPage(browser, origin, desktopSize);
   await admin.goto(`${origin}/admin`);
   await admin.getByRole("heading", { name: "Masuk Admin" }).waitFor();
   await signIn(admin, "Madevi-Admin", password);
+  await admin.getByRole("link",{name:"Siapkan autentikator"}).click();
+  await admin.getByLabel("Kata sandi",{exact:true}).fill(password);
+  const enrollment=admin.waitForResponse(response=>response.url().endsWith("/api/auth/two-factor/enable"));
+  await admin.getByRole("button",{name:"Siapkan autentikator"}).click();
+  const result=await enrollment;
+  assert.equal(result.status(),200,"Aktivasi autentikator admin gagal");
+  const secret=new URL((await result.json()).totpURI).searchParams.get("secret");
+  await admin.getByLabel("Kode autentikator").fill(authenticatorCode(secret));
+  await admin.getByRole("button",{name:"Aktifkan"}).click();
   await admin.getByRole("heading", { name: "Dashboard" }).waitFor();
   await admin.getByText("Terhubung", { exact: true }).waitFor();
   await capture(admin, directory, imageNames[4]);
@@ -171,7 +186,5 @@ try {
     app.kill();
     await closed;
   }
-  if (database.listening) await new Promise(resolve => database.close(resolve));
-  await db.close();
   await rm(directory, { recursive: true, force: true });
 }

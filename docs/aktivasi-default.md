@@ -6,7 +6,7 @@ Ikuti urutan ini untuk staging dengan data sintetis, lalu ulangi dengan konfigur
 
 - Siapkan checkout Madevi-Site, Node.js 24 dan npm di mesin operator, satu server Linux dengan Docker Compose, akses SSH yang dikuasai pemilik, dan PostgreSQL 18 yang dapat dijangkau server. Gunakan satu database per lingkungan.
 - Siapkan nama host staging dan akses DNS. Untuk jalur Compose, gunakan Caddy pada host dan sertifikat HTTPS. Port 80/443 menghadap publik, sedangkan port aplikasi tetap loopback.
-- Buat akun layanan yang dibutuhkan atas nama pemilik. SMTP diperlukan saat membuka pendaftaran email. Google bersifat opsional untuk pengguna biasa. Avatar dan gambar laporan tetap di database. Contoh penyedia dan harga ada sebagai [opsi tambahan](online.md#dua-jalur).
+- Buat akun layanan yang dibutuhkan atas nama pemilik. SMTP diperlukan saat membuka pendaftaran email. Google bersifat opsional untuk pengguna biasa. Avatar, gambar laporan, dan pustaka gambar tetap di PostgreSQL. Contoh penyedia dan harga ada sebagai [opsi tambahan](online.md#dua-jalur).
 
 ## 2. Ambil nilai dan pisahkan role
 
@@ -62,7 +62,19 @@ Migrasi menampilkan `Migrasi selesai.` jika skema telah dicatat. `check:ready` m
 3. Dengan SMTP aktif, daftar menggunakan alamat uji, verifikasi, masuk, ganti email, dan coba reset. Coba foto pendaftaran serta laporan. Dengan Google aktif, masuk sebagai pengguna biasa dan konfirmasi penolakan admin pada alur Google. Cocokkan log provider tanpa menyalin token atau isi email.
 4. Uji monitoring dan pemulihan dump pada database uji. Gunakan [checklist sebelum dan sesudah online](../ops/deploy-checklist.md). Buka produksi setelah pemilik menyetujui hasil, data dan biaya.
 
-## 6. Kenali kegagalan dan pulihkan
+## 6. Siapkan pekerjaan host
+
+1. Pada mesin operator, buat jadwal yang menjalankan satu putaran antrean dengan root kerja di checkout dan env yang sama dengan lingkungan website. Jalur ini memakai PostgreSQL yang sama. Perintah instalasi Node adalah `npm run jobs:dispatch`. Dari root yang menjalankan Compose gunakan `docker compose run --rm madevi npm run jobs:dispatch`, dengan opsi staging yang sama seperti aplikasi. Contoh jadwal cron untuk interval satu menit adalah:
+
+```cron
+* * * * * cd /srv/madevi-site && /usr/bin/docker compose run --rm madevi npm run jobs:dispatch
+```
+
+2. Uji dari **Notifikasi & Pesan** dengan satu pengguna sintetis. Jadwalkan satu menit ke depan. Sebelum waktu jatuh tempo, pekerjaan tetap terjadwal. Setelah worker berjalan, lihat status pengiriman dan pesan pada akun tujuan. Log worker memuat jumlah pekerjaan terkirim/gagal tanpa isi pesan. Gunakan file log yang dirotasi atau fasilitas logging host dan alarm untuk kegagalan worker.
+3. Ikuti [backup terenkripsi](../ops/backup-restore.md) untuk menyiapkan `MADEVI_BACKUP_DIR`, `MADEVI_BACKUP_KEY`, akses PostgreSQL dan alat klien. Jalankan backup, periksa tag, pulihkan ke database terpisah dan periksa riwayat dari admin. Atur retensi dan lokasi salinan sesuai RPO/RTO yang disetujui.
+4. Pantau liveness dan readiness dari origin tujuan dan uji setidaknya satu alur pendaftaran/email, akses admin, publikasi, lampiran, pengiriman terjadwal, dan pemulihan pada staging. [Panduan admin](admin.md)
+
+## 7. Kenali kegagalan dan pulihkan
 
 - **Konfigurasi kosong atau tidak valid.** Perbaiki variabel yang disebut oleh `check:ready`; restart ketika env runtime berubah. Pastikan namespace env dan origin sesuai lingkungan.
 - **Liveness 200, readiness 503.** `schema_pending` berarti skema belum lengkap; periksa checksum dan jalankan migrasi dengan role yang benar. `database_unavailable` berarti periksa jaringan, verifikasi TLS, pool dan izin runtime. Probe tetap tidak menguji layanan email/Google.

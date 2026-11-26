@@ -29,12 +29,16 @@ export async function POST(request:Request){
     await client.query("ROLLBACK");
     return NextResponse.json({ error: "Batas laporan sementara tercapai. Coba lagi dalam 24 jam." }, { status: 429 });
   }
+  const response = await client.query(`SELECT response FROM madevi_support_rules
+    WHERE enabled AND (starts_at IS NULL OR starts_at<=now()) AND (ends_at IS NULL OR ends_at>now())
+    AND (keyword IS NULL OR position(keyword in lower($1))>0) ORDER BY length(keyword) DESC NULLS LAST,id LIMIT 1`,[input.data.message]);
+  const automaticResponse: string | null = response.rows[0]?.response ?? null;
   await client.query(
-    "INSERT INTO madevi_reports (body,user_id,rate_key,reference_url,image_webp) VALUES ($1,$2,$3,$4,$5)",
-    [input.data.message, account?.row.id || null, key, input.data.url || null, image],
+    "INSERT INTO madevi_reports (body,user_id,rate_key,reference_url,image_webp,automatic_response) VALUES ($1,$2,$3,$4,$5,$6)",
+    [input.data.message,account?.row.id||null,key,input.data.url||null,image,automaticResponse],
   );
   await client.query("COMMIT");
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ok:true,automaticResponse});
  } catch {
   if (client) await client.query("ROLLBACK").catch(() => {});
   return NextResponse.json({ error: "Laporan belum berhasil dikirim." }, { status: 503 });

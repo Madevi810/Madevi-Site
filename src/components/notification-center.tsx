@@ -2,12 +2,12 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 type Category = "general" | "system" | "social";
-type Notice = { id:string; category:Category; title:string; body:string; is_read:boolean; created_at:string };
+type Notice = { id:string; category:Category; title:string; body:string; is_read:boolean; created_at:string; media_id?:string|null };
 type Result = {notifications:Notice[];signedIn:boolean;nextCursor:string|null};
 const categories = [["general","Umum","General"],["system","Sistem","System"],["social","Sosial","Social"]] as const;
 
-export function NotificationCenter({english,onClose}:{english:boolean;onClose:()=>void}){
-  const [category,setCategory]=useState<Category>("general");
+export function NotificationCenter({english,onClose,initialCategory="general"}:{english:boolean;onClose:()=>void;initialCategory?:Category}){
+  const [category,setCategory]=useState<Category>(initialCategory);
   const [rows,setRows]=useState<Notice[]>([]);
   const [signedIn,setSignedIn]=useState(false);
   const [cursor,setCursor]=useState<string|null>(null);
@@ -50,7 +50,7 @@ export function NotificationCenter({english,onClose}:{english:boolean;onClose:()
       {categories.map(([id,label,en],index)=><button ref={node=>{tabRefs.current[index]=node}} className="flex-1 border-0 border-b-2 border-solid border-transparent bg-transparent px-madevi-3 py-madevi-9 text-madevi-12 text-madevi-muted aria-selected:border-madevi-accent aria-selected:font-bold aria-selected:text-madevi-text" key={id} id={`${groupId}-${id}`} aria-controls={`${groupId}-panel`} type="button" role="tab" tabIndex={category===id?0:-1} aria-selected={category===id} onClick={()=>setCategory(id)}>{t(label,en)}</button>)}
     </div>
     <div id={`${groupId}-panel`} aria-labelledby={`${groupId}-${category}`} className="max-h-madevi-260 overflow-auto text-madevi-12 text-madevi-muted" role="tabpanel" aria-busy={loading||loadingMore}>
-      {loading?<p role="status">{t("Memuat notifikasi…","Loading notifications…")}</p>:category!=="general"&&!signedIn?<p>{t("Masuk untuk melihat notifikasi pribadi.","Sign in to view personal notifications.")}</p>:rows.length?rows.map(n=><button key={n.id} className="flex w-full flex-col gap-madevi-5 border-0 border-b border-solid border-madevi-line bg-transparent px-0 py-madevi-12 text-left" type="button" onClick={()=>void mark(n)}><strong className="text-madevi-text">{n.title}</strong><span>{n.body}</span><time dateTime={n.created_at}>{new Intl.DateTimeFormat(english?"en":"id",{dateStyle:"medium",timeStyle:"short"}).format(new Date(n.created_at))}</time>{!n.is_read&&signedIn&&<small className="text-madevi-accent">{t("Belum dibaca","Unread")}</small>}</button>):!error?<p>{t("Belum ada notifikasi.","No notifications yet.")}</p>:null}
+      {loading?<p role="status">{t("Memuat notifikasi…","Loading notifications…")}</p>:category!=="general"&&!signedIn?<p>{t("Masuk untuk melihat notifikasi pribadi.","Sign in to view personal notifications.")}</p>:rows.length?rows.map(n=><div key={n.id}><button className="flex w-full flex-col gap-madevi-5 border-0 border-b border-solid border-madevi-line bg-transparent px-0 py-madevi-12 text-left" type="button" onClick={()=>void mark(n)}><strong className="text-madevi-text">{n.title}</strong><span>{n.body}</span><time dateTime={n.created_at}>{new Intl.DateTimeFormat(english?"en":"id",{dateStyle:"medium",timeStyle:"short"}).format(new Date(n.created_at))}</time>{!n.is_read&&signedIn&&<small className="text-madevi-accent">{t("Belum dibaca","Unread")}</small>}</button>{n.media_id&&<a href={`/api/media/${n.media_id}`}>{t("Lihat lampiran","View attachment")}</a>}</div>):!error?<p>{t("Belum ada notifikasi.","No notifications yet.")}</p>:null}
       {error&&<div role="alert"><p>{error}</p>{!rows.length&&<button type="button" className="border-0 bg-transparent p-madevi-6 text-madevi-accent" onClick={()=>setRevision(x=>x+1)}>{t("Coba lagi","Try again")}</button>}</div>}
       {cursor&&<button type="button" className="border-0 bg-transparent p-madevi-6 text-madevi-accent" disabled={loadingMore} onClick={()=>void loadMore()}>{loadingMore?t("Memuat…","Loading…"):t("Muat lebih banyak","Load more")}</button>}
     </div>

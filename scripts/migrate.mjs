@@ -23,6 +23,7 @@ if (issues.length) {
   try {
     client = await pool.connect();
     await client.query("SELECT pg_advisory_lock(7412302)");
+    await client.query("SELECT pg_advisory_lock(7412311)");
     if (!down) {
       // Better Auth uses a separate connection. Hold the lock without an open transaction.
       const migrations = await getMigrations(authOptions);
@@ -41,6 +42,7 @@ if (issues.length) {
     console.error(message);
     process.exitCode = 1;
   } finally {
+    await client?.query("SELECT pg_advisory_unlock(7412311)").catch(() => {});
     await client?.query("SELECT pg_advisory_unlock(7412302)").catch(() => {});
     client?.release();
     await pool.end();

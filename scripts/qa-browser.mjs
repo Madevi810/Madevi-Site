@@ -50,6 +50,14 @@ export async function verifyRegressionJourneys({browser,origin,env,db}) {
     await db.exec(`UPDATE account SET password='${await hashPassword(env.DEMO_PASSWORD)}' WHERE "userId"=(SELECT id FROM "user" WHERE username='madevi-user')`);
   }
 
+  const beforeHydration=await browser.newContext({javaScriptEnabled:false});
+  try {
+    const page=await beforeHydration.newPage();
+    await page.goto(`${origin}/admin`);
+    assert.equal(await page.locator("form").getAttribute("method"),"post");
+    assert.equal(await page.getByRole("button",{name:"Masuk",exact:true}).isDisabled(),true);
+  } finally {await beforeHydration.close();}
+
   const admin=await browser.newContext();
   try {
     const page=await admin.newPage();
@@ -58,13 +66,28 @@ export async function verifyRegressionJourneys({browser,origin,env,db}) {
     await page.locator('input[name="password"]').fill(env.DEMO_PASSWORD);
     await page.getByRole('button',{name:'Masuk',exact:true}).click();
     await page.getByRole('heading',{name:'Dashboard',exact:true}).waitFor();
-    for(const [label,panel,heading] of [['Pengguna','users','Pengguna'],['Konten','content','Buat draf'],['Laporan Masalah','reports','Laporan Masalah'],['Notifikasi','notifications','Notifikasi dan pesan'],['Sistem','system','Sistem dan pemulihan']]) {
+    for(const [label,panel,heading] of [['Pengguna','users','Pengguna'],['Ruang Madevi','content','Buat draf'],['Laporan & Dukungan','reports','Laporan Masalah'],['Notifikasi & Pesan','notifications','Notifikasi & Pesan'],['Database & Pemulihan','system','Database & Pemulihan']]) {
       await page.goto(`${origin}/admin/profile`);
       await page.getByRole('heading',{name:'Profil Admin',exact:true}).waitFor();
       await page.getByRole('button',{name:'Menu admin',exact:true}).click();
       await page.getByRole('dialog',{name:'Menu admin'}).getByRole('button',{name:new RegExp(label)}).click();
       await page.waitForURL(`${origin}/admin?panel=${panel}`);
       await page.getByRole('heading',{name:heading,exact:true}).waitFor();
+    }
+    await page.getByRole("button",{name:"Cari di panel",exact:true}).click();
+    const menu=page.getByRole("dialog",{name:"Menu admin",exact:true});
+    await menu.getByRole("searchbox",{name:"Cari menu",exact:true}).fill("explore");
+    await menu.getByRole("button",{name:"Explore & Learn",exact:true}).click();
+    await page.getByRole("heading",{name:"Explore & Learn",exact:true}).waitFor();
+    await page.waitForURL(url=>url.searchParams.get("room")==="explore");
+    await page.getByRole("button",{name:"Menu admin",exact:true}).click();
+    await page.keyboard.press("Escape");
+    await menu.waitFor({state:"hidden"});
+    const tested=["rules","pages","settings","media","statistics","security"];
+    for(const panel of tested) {
+      await page.goto(`${origin}/admin?panel=${panel}`);
+      await page.getByRole("heading",{level:1}).waitFor();
+      await page.getByText("Memuat data…",{exact:true}).first().waitFor({state:"hidden"});
     }
     await page.goto(`${origin}/admin?panel=invalid`);
     await page.getByRole('heading',{name:'Dashboard',exact:true}).waitFor();

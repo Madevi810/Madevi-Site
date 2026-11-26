@@ -1,3 +1,3 @@
-import { PublicShell } from "@/components/public-shell";
-export default function Home() { return <PublicShell page="home" />; }
+import { PublicPage } from "@/components/public-page";
+export default function Home() { return <PublicPage page="home" />; }
 

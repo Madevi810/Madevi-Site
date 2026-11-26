@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { editorialMetadata } from "./content-metadata";
 import { authOrigin } from "./env";
 
 export const spaces = ["explore","tutorial","school","shop","tools","services","line"] as const;
 export const slug = z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const safeJson = z.record(z.string().max(80), z.unknown()).refine(value => JSON.stringify(value).length <= 20000, "Ukuran data terlalu besar");
-export const contentInput = z.object({ space: z.enum(spaces), type: z.string().regex(/^[a-z][a-z0-9_-]{1,49}$/), slug, title: z.string().trim().min(1).max(200), body: safeJson, metadata: safeJson.default({}) }).strict();
+export const contentInput = z.object({ space: z.enum(spaces), type: z.string().regex(/^[a-z][a-z0-9_-]{1,49}$/), slug, title: z.string().trim().min(1).max(200), body: safeJson, metadata: safeJson.pipe(editorialMetadata).default({}) }).strict();
 export const revisionInput = contentInput.pick({ title:true, body:true, metadata:true }).extend({ expectedRevision:z.number().int().min(1) }).strict();
 export const transitionInput = z.object({ action:z.enum(["submit","approve","publish","archive","reopen"]), expectedRevision:z.number().int().min(1), note:z.string().trim().max(1000).optional() }).strict();
-export const queryInput = z.object({ page:z.coerce.number().int().min(1).max(1000).default(1), limit:z.coerce.number().int().min(1).max(50).default(20), space:z.enum(spaces).optional(), type:z.string().regex(/^[a-z][a-z0-9_-]{1,49}$/).optional(), sort:z.enum(["updated","created","title"]).default("updated"), order:z.enum(["asc","desc"]).default("desc"), q:z.string().trim().max(100).optional(), status:z.enum(["draft","in_review","approved","published","archived"]).optional() }).strict();
+export const queryInput = z.object({ page:z.coerce.number().int().min(1).max(1000).default(1), limit:z.coerce.number().int().min(1).max(50).default(20), space:z.enum(spaces).optional(), type:z.string().regex(/^[a-z][a-z0-9_-]{1,49}$/).optional(), sort:z.enum(["updated","created","title"]).default("updated"), order:z.enum(["asc","desc"]).default("desc"), q:z.string().trim().max(100).optional(), category:z.string().trim().min(1).max(80).optional(), tag:z.string().trim().min(1).max(60).optional(), trash:z.enum(["active","only"]).optional(), status:z.enum(["draft","in_review","approved","published","archived"]).optional() }).strict();
 export function parseQuery(url:string) { return queryInput.safeParse(Object.fromEntries(new URL(url).searchParams)); }
 export function sameOrigin(request:Request):boolean {
   try { return Boolean(request.headers.get("origin")) && request.headers.get("origin") === authOrigin(); }

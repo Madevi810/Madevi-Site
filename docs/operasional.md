@@ -1,6 +1,6 @@
 # Memelihara Madevi setelah online
 
-Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplikasi, dan tempat aman untuk backup. Kerjakan latihan di staging sebelum produksi. Kode sudah memiliki probe dan log terstruktur. Penyedia monitoring, jadwal backup, enkripsi dan alarm aktif masih perlu disiapkan.
+Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplikasi, dan tempat aman untuk backup. Kerjakan latihan di staging sebelum produksi. Kode sudah memiliki probe dan log terstruktur. Siapkan penyedia monitoring, jadwal host, akses kunci, target terpisah, dan alarm setelah lingkungan tersedia.
 
 ## Pemeriksaan rutin
 
@@ -11,8 +11,8 @@ Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplika
 ## Backup dan latihan pemulihan
 
 1. Pilih sasaran pemulihan. **RPO** adalah jumlah perubahan yang rela hilang sejak backup terakhir. **RTO** adalah batas waktu untuk memulihkan layanan. Gunakan sasaran itu untuk memilih frekuensi, retensi, tujuan penyimpanan terenkripsi, dan pemeriksaan kegagalan.
-2. Dari root checkout operator, pasang alat klien PostgreSQL kompatibel dan siapkan URI/CA/role backup secara privat. Image Madevi tidak menyertakan `pg_dump`. Siapkan direktori privat di luar repo dan jalankan `npm run db:backup -- /direktori-privat/madevi-uji.dump`. Ganti jalur sesuai mesin. Skrip membuat satu file privat dan menolak menimpa target. Enkripsi dan simpan salinan terpisah. [Prosedur backup](../ops/backup-restore.md#backup-logis)
-3. Pulihkan ke database **baru dan kosong** dengan `pg_restore` menurut [langkah restore](../ops/backup-restore.md#restore-terisolasi). Cek checksum migrasi, jumlah record, contoh avatar/gambar laporan, admin dan health. Catat waktu dan validasi akses. Jika restore gagal, periksa versi alat, format dump, ruang disk, hak akses, dan CA. Ulangi di database uji kosong baru.
+2. Dari root checkout operator, pasang klien PostgreSQL yang kompatibel. Siapkan role, direktori privat dan kunci di host. Jalankan `npm run db:backup:encrypted` dan `npm run db:verify:encrypted` dengan nama file yang dihasilkan. [Prosedur backup](../ops/backup-restore.md#buat-dan-periksa-cadangan)
+3. Pulihkan cadangan terverifikasi ke database baru dan kosong. Bandingkan riwayat migrasi, contoh avatar, gambar pustaka dan laporan, akses admin, serta probe. [Langkah restore](../ops/backup-restore.md#pulihkan-ke-target-terisolasi)
 4. Jadwalkan backup dan uji pengulangan secara berkala setelah prosedur manual lulus. Untuk media yang nanti dipindah keluar DB, buat jadwal backup media dan uji kesesuaiannya dengan referensi di database.
 
 ## Rollback dan pindah penyedia

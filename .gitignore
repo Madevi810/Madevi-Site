@@ -6,6 +6,7 @@ node_modules/
 coverage/
 
 *.dump
+*.dump.gcm
 *.backup
 *.tsbuildinfo
 

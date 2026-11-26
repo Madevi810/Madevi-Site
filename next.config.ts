@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  ...(process.env.MADEVI_QA_HIDE_DEV_INDICATOR === "1" ? { devIndicators: false as const } : {}),
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: [

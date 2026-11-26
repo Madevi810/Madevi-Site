@@ -15,11 +15,12 @@ psql_as_ci() {
 psql_as_ci -d postgres <<'SQL'
 CREATE ROLE madevi_qa_migrator LOGIN NOSUPERUSER PASSWORD 'ci-migrator-only';
 CREATE ROLE madevi_qa_runtime LOGIN NOSUPERUSER PASSWORD 'ci-runtime-only';
+CREATE ROLE madevi_qa_backup LOGIN NOSUPERUSER PASSWORD 'ci-backup-only';
 CREATE DATABASE madevi_ci_roles OWNER madevi_qa_migrator;
 SQL
 
 grants() {
-  psql_as_ci -d madevi_ci_roles -v migrator=madevi_qa_migrator -v runtime=madevi_qa_runtime < database/roles.example.sql
+  psql_as_ci -d madevi_ci_roles -v migrator=madevi_qa_migrator -v runtime=madevi_qa_runtime -v backup=madevi_qa_backup < database/roles.example.sql
 }
 grants
 export BETTER_AUTH_URL=https://localhost
@@ -39,4 +40,5 @@ if node scripts/create-owner.mjs; then
 fi
 test "$(psql_as_ci -d madevi_ci_roles -tAc "SELECT count(*) FROM \"user\" WHERE \"madeviRole\"='admin'")" = "1"
 test "$(psql_as_ci -d madevi_ci_roles -tAc "SELECT has_schema_privilege('madevi_qa_runtime','public','CREATE') OR has_table_privilege('madevi_qa_runtime','madevi_schema_migrations','UPDATE')")" = "f"
+test "$(psql_as_ci -d madevi_ci_roles -tAc "SELECT has_table_privilege('madevi_qa_backup','madevi_content','SELECT') AND NOT has_table_privilege('madevi_qa_backup','madevi_content','UPDATE') AND has_sequence_privilege('madevi_qa_backup','madevi_report_events_id_seq','SELECT')")" = "t"
 echo "Lulus: migrasi dengan role non-superuser, pemeriksaan runtime dan bootstrap pemilik tunggal."

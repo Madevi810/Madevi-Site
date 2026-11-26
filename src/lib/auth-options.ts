@@ -1,4 +1,5 @@
 import { twoFactor, username, emailOTP } from "better-auth/plugins";
+import { accountRestricted } from "./account-status.ts";
 import { pool } from "./db.ts";
 import { createSmtpTransport } from "./mail.ts";
 import type { BetterAuthOptions } from "better-auth";
@@ -69,7 +70,7 @@ export const authOptions = {
     } } },
     session: { create: { before: async (session, context) => {
       const result = await pool.query(
-        'SELECT suspended, "emailVerified", "isDemo", "madeviRole" FROM "user" WHERE id=$1', [session.userId],
+        `SELECT ${accountRestricted} AS suspended, "emailVerified", "isDemo", "madeviRole" FROM "user" u WHERE id=$1`, [session.userId],
       );
       const user = result.rows[0];
       if (!user || user.suspended || !user.emailVerified || (user.isDemo && !isDemoAllowed())) return false;

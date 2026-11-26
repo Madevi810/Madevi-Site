@@ -1,7 +1,7 @@
 {
   "name": "madevi-platform",
   "type": "module",
-  "version": "0.0.0-19",
+  "version": "0.0.0-20",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
@@ -16,7 +16,11 @@
     "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
     "check:ready": "node --env-file-if-exists=.env.local scripts/check-ready.mjs",
     "test:integration": "node scripts/test-db-local.mjs",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "jobs:dispatch": "node --env-file-if-exists=.env.local scripts/dispatch-messages.mjs",
+    "db:backup:encrypted": "node --env-file-if-exists=.env.local scripts/encrypted-database.mjs backup",
+    "db:verify:encrypted": "node --env-file-if-exists=.env.local scripts/encrypted-database.mjs verify",
+    "db:restore:encrypted": "node --env-file-if-exists=.env.local scripts/encrypted-database.mjs restore"
   },
   "engines": {
     "node": ">=24.0.0"

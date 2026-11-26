@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { isDemoAllowed } from "./config.ts";
 
 export function databaseUrl(env: NodeJS.ProcessEnv = process.env): string {
@@ -49,12 +50,21 @@ export function googleSettings(env: NodeJS.ProcessEnv = process.env) {
   return { clientId, clientSecret };
 }
 
+export function backupSettings(env: NodeJS.ProcessEnv = process.env) {
+  const directory=env.MADEVI_BACKUP_DIR, key=env.MADEVI_BACKUP_KEY;
+  if(!directory&&!key)return null;
+  if(!directory||!isAbsolute(directory)||!key||!/^[0-9a-f]{64}$/i.test(key)) {
+    throw new Error("Backup memerlukan MADEVI_BACKUP_DIR absolut dan MADEVI_BACKUP_KEY dengan 64 karakter hex");
+  }
+  return {directory,key};
+}
+
 export function configurationIssues(env: NodeJS.ProcessEnv = process.env): string[] {
   const issues: string[] = [];
   const mode = env.MADEVI_ENV || "dev";
   if (!["dev", "staging", "production"].includes(mode)) issues.push("MADEVI_ENV harus dev, staging atau production");
   if (env.NODE_ENV === "production" && (!env.MADEVI_ENV || mode === "dev")) issues.push("NODE_ENV=production memerlukan MADEVI_ENV staging atau production");
-  for (const validate of [databaseUrl, authOrigin, smtpSettings, googleSettings]) {
+  for (const validate of [databaseUrl, authOrigin, smtpSettings, googleSettings, backupSettings]) {
     try { validate(env); }
     catch (error) { issues.push(error instanceof Error ? error.message : "Konfigurasi tidak valid"); }
   }
