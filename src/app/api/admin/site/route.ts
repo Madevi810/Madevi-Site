@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { z } from "zod";
 import { currentAdmin } from "@/lib/access";
 import { bodyJson, failure, sameOrigin } from "@/lib/api";
@@ -5,7 +6,7 @@ import { pool } from "@/lib/db";
 import { changeSite, informationInput, readInformation, readSite, siteInput, siteResource, SiteVersionError } from "@/lib/site-config";
 
 const headers={"Cache-Control":"no-store"};
-export async function GET(request:Request) {
+async function handleGET(request:Request) {
   if(!await currentAdmin())return failure("Tidak diizinkan",403);
   try {
     const search=new URL(request.url).searchParams;
@@ -18,7 +19,7 @@ export async function GET(request:Request) {
     return Response.json({history:rows.slice(0,20),next:rows.length>20?rows[19].version:null},{headers});
   } catch {return failure("Pengaturan belum tersedia.",503);}
 }
-export async function PUT(request:Request) {
+async function handlePUT(request:Request) {
   const account=await currentAdmin();
   if(!account||!sameOrigin(request))return failure("Tidak diizinkan",403);
   const body=await bodyJson(request).catch(()=>null);
@@ -30,7 +31,7 @@ export async function PUT(request:Request) {
     return Response.json({ok:true,version},{headers});
   } catch(error) {return error instanceof SiteVersionError?failure(error.message,409):failure("Pengaturan belum tersimpan.",503);}
 }
-export async function POST(request:Request) {
+async function handlePOST(request:Request) {
   const account=await currentAdmin();
   if(!account||!sameOrigin(request))return failure("Tidak diizinkan",403);
   const result=z.object({resource:siteResource,expectedVersion:z.number().int().nonnegative(),version:z.number().int().nonnegative()})
@@ -41,3 +42,7 @@ export async function POST(request:Request) {
     return Response.json({ok:true,version:await changeSite(account.row.id,resource,expectedVersion,undefined,version)},{headers});
   } catch(error){return error instanceof SiteVersionError?failure(error.message,409):failure("Pengaturan belum dipulihkan.",503);}
 }
+
+export const GET=apiRoute("/api/admin/site", "GET", handleGET);
+export const PUT=apiRoute("/api/admin/site", "PUT", handlePUT);
+export const POST=apiRoute("/api/admin/site", "POST", handlePOST);

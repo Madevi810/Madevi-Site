@@ -1,17 +1,18 @@
 "use client";
 
 import { AdminLoading, localDate, useAdminData } from "./admin-data";
+import { operationalStatus, type OperationalCheck } from "./admin-system";
 import { adminPanel, textButton } from "./styles";
 
 type Probe={ok:boolean;status:number;ms:number}|null;
 type Monitoring={
   since:string;checkedAt:string;labels:Record<string,string>;database:string;
   requests:{route:string;count:string;errors:string;client:string;average:number;maximum:number;at:string}[];
-  host:null|{checked_at:string;fresh:boolean;metrics:{live:Probe;ready:Probe;disk:null|{total:string;available:string};memory:{total:number;free:number};load:number;cores:number}};
+  host:null|{checked_at:string;fresh:boolean;metrics:{live:Probe;ready:Probe;disk:null|{total:string;available:string};memory:{total:number;free:number};load:number;cores:number;checks?:Record<string,OperationalCheck>}};
   incidents:{source:string;opened_at:string;resolved_at:string|null;detail:string}[];
   operations:{kind:string;queued:number;running:number;failed:number;completed:number;average:number|null}[];
   messages:{due:number;scheduled:number;failed:number};
-  dispatch:{checked_at:string;delivered:number;failed:number}|null;
+  dispatch:{checked_at:string;delivered:number;failed:number;fresh:boolean}|null;
 };
 const units=new Intl.NumberFormat("id-ID",{maximumFractionDigits:1});
 const bytes=(value:string|number)=>`${units.format(Number(value)/1024/1024)} MiB`;
@@ -39,15 +40,16 @@ export function OperationsMonitoring() {
         <ul><li>Live {formatProbe(data.host.metrics.live)}</li><li>Ready {formatProbe(data.host.metrics.ready)}</li>
         <li>Memori tersedia {bytes(data.host.metrics.memory.free)} dari {bytes(data.host.metrics.memory.total)}</li>
         <li>Beban 1 menit {data.host.metrics.load} · {data.host.metrics.cores} CPU tersedia untuk worker</li>
-        <li>Disk backup {data.host.metrics.disk?`${bytes(data.host.metrics.disk.available)} tersedia dari ${bytes(data.host.metrics.disk.total)}`:"Belum tersedia atau gagal diukur"}</li></ul>
+        <li>Disk backup {data.host.metrics.disk?`${bytes(data.host.metrics.disk.available)} tersedia dari ${bytes(data.host.metrics.disk.total)}`:data.host.metrics.checks?.backup?.state==="unconfigured"?"Belum dikonfigurasi":"Gagal diukur"}</li></ul>
+        {data.host.metrics.checks?.alert&&<p>Alarm · {data.host.fresh?operationalStatus[data.host.metrics.checks.alert.state]:"Pengukuran kedaluwarsa"}. {data.host.metrics.checks.alert.detail}</p>}
       </>:<p>Worker host belum mengirim pengukuran.</p>}
       <h3>Antrean dan durasi</h3>
       <p>Sumber tabel operasi dan pesan. Status antrean berlaku saat dibaca. Jumlah hasil dan rata-rata durasi operasi dihitung sejak {localDate(data.since)}.</p>
       <p>Pesan {data.messages.due} jatuh tempo · {data.messages.scheduled} terjadwal · {data.messages.failed} berstatus gagal.</p>
-      <p>{data.dispatch?`Putaran worker pesan ${localDate(data.dispatch.checked_at)} · ${data.dispatch.delivered} berhasil · ${data.dispatch.failed} gagal.`:"Worker pesan belum mengirim hasil."}</p>
+      <p>{data.dispatch?`Putaran worker pesan ${localDate(data.dispatch.checked_at)} · ${data.dispatch.delivered} berhasil · ${data.dispatch.failed} gagal${data.dispatch.fresh?"":" · kedaluwarsa"}.`:"Worker pesan belum mengirim hasil."}</p>
       {data.operations.length?<ul>{data.operations.map(row=><li key={row.kind}>{jobLabels[row.kind]} · {row.queued} antre · {row.running} berjalan · {row.completed} berhasil · {row.failed} gagal · {row.average===null?"durasi belum tersedia":`rata-rata ${row.average} detik`}</li>)}</ul>:<p>Belum ada pekerjaan operasi.</p>}
       <h3>Gangguan dan pemulihan</h3>
-      <p>20 kejadian terakhir dari probe dan worker operasi. Kejadian selesai dipertahankan 90 hari.</p>
+      <p>20 kejadian terakhir dari probe dan worker operasi. Riwayat insiden dipertahankan.</p>
       {data.incidents.length?<ul>{data.incidents.map(row=><li className="border-b border-madevi-line py-2" key={row.source+row.opened_at}>
         <strong>{row.source}</strong> · {row.detail}<p>Mulai {localDate(row.opened_at)} · {row.resolved_at?`Pulih ${localDate(row.resolved_at)}`:"Masih terbuka"}</p>
       </li>)}</ul>:<p>Belum ada kejadian tercatat.</p>}

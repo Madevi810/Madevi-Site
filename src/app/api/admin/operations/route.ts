@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { observeRoute } from "@/lib/monitoring";
 import { z } from "zod";
 import { currentAdmin } from "@/lib/access";
@@ -8,16 +9,23 @@ import { checkDatabaseReadiness } from "@/lib/readiness";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { rateHash } from "@/lib/rate-identity";
 import { capabilitiesSchema, operationRequest, restoreConfirmation } from "@/lib/operations-control";
-import { backupName } from "@/lib/backup-artifact";
+import { backupDirectory, backupName } from "@/lib/backup-artifact";
 
 const headers={"Cache-Control":"no-store"};
-const operationColumns=`id,kind,status,artifact,bytes,requested_at,requested_by,started_at,finished_at,details,phase,retry_of,
-  parameters->>'target' AS target,parameters->>'artifactId' AS artifact_id,
+const operationColumns=`id,kind,status,artifact,bytes,requested_at,requested_by,started_at,finished_at,details,phase,coalesce(progress_at,finished_at,started_at,requested_at) AS progress_at,retry_of,
+  parameters->>'target' AS target,parameters->>'artifactId' AS artifact_id, parameters @> '{"routine":true}' AS routine,
   extract(epoch from coalesce(finished_at,now())-started_at)::int AS seconds`;
 
-export async function GET(request:Request) {
-  if(!await currentAdmin())return failure("Tidak diizinkan",403);
+async function handleGET(request:Request) {
+  const admin=await currentAdmin();
+  if(!admin)return failure("Tidak diizinkan",403);
   const params=new URL(request.url).searchParams;
+  const tracked=params.get("request");
+  if(tracked!==null) {
+    if(!z.uuid().safeParse(tracked).success)return failure("ID permintaan tidak valid.",400);
+    const {rows}=await pool.query("SELECT id,status FROM madevi_operations WHERE id=$1 AND requested_by=$2",[tracked,admin.row.id]);
+    return rows[0]?Response.json(rows[0],{headers}):failure("Permintaan belum ditemukan.",404);
+  }
   const page=z.coerce.number().int().min(1).max(10000).safeParse(params.get("page")??1);
   const backups=z.coerce.number().int().min(1).max(10000).safeParse(params.get("backups")??1);
   if(!page.success||!backups.success)return failure("Halaman tidak valid",400);
@@ -28,14 +36,16 @@ export async function GET(request:Request) {
       pool.query("SELECT version,checksum,applied_at FROM madevi_schema_migrations ORDER BY version DESC"),
       pool.query(`SELECT id,artifact,bytes,finished_at FROM madevi_operations WHERE kind='backup' AND status='completed'
         ORDER BY requested_at DESC,id DESC LIMIT 26 OFFSET $1`,[(backups.data-1)*25]),
-      pool.query("SELECT checked_at,capabilities,checked_at>now()-interval '10 minutes' AS fresh FROM madevi_operations_health WHERE id=1"),
+      pool.query("SELECT checked_at,capabilities,metrics->'checks' AS readiness,checked_at>now()-interval '10 minutes' AS fresh FROM madevi_operations_health WHERE id=1"),
       pool.query(`SELECT id,parameters->>'target' AS target,finished_at FROM madevi_operations WHERE kind='target_check'
         AND status='completed' AND finished_at>now()-interval '10 minutes' ORDER BY finished_at DESC LIMIT 5`)
     ]);
     const snapshot=worker.rows[0];
+    const download=process.env.MADEVI_BACKUP_DOWNLOAD_DIR;
+    const downloadState=download?await backupDirectory(download).then(()=> "ready",()=> "failed"):"inactive";
     return Response.json({readiness,jobs:jobs.rows.slice(0,25),next:jobs.rows.length>25,migrations:migrations.rows,
       artifacts:artifacts.rows.slice(0,25),moreArtifacts:artifacts.rows.length>25,
-      downloadConfigured:Boolean(process.env.MADEVI_BACKUP_DOWNLOAD_DIR),worker:snapshot??null,checks:checks.rows},{headers});
+      downloadConfigured:downloadState==="ready",downloadState,worker:snapshot??null,checks:checks.rows},{headers});
   } catch {return failure("Riwayat operasi tidak dapat dibaca.",503);}
 }
 
@@ -58,11 +68,12 @@ async function handlePOST(request:Request) {
       if(!matches(existing))return failure("ID permintaan sudah dipakai.",409);
       return Response.json({id:input.id,status:existing.status},{headers});
     }
-    if(!await consumeRateLimit(`operations:confirm:${rateHash(admin.row.id)}`,8,300))return failure("Tunggu sebelum memeriksa ulang kata sandi.",429);
+    if(!await consumeRateLimit(`operations:confirm:${rateHash(admin.row.id)}`,8,300))return failure("Tunggu sebelum memeriksa ulang kata sandi.",429,300);
     try {
       const result=await auth.api.verifyPassword({headers:request.headers,body:{password:input.password}});
-      if(!result.status)throw Error();
-    } catch {
+      if(!result.status)return failure("Identitas belum terkonfirmasi.",403);
+    } catch (error) {
+      if(!(error instanceof Error&&"statusCode" in error&&[400,401,403].includes(Number(error.statusCode))))throw error;
       await pool.query(`INSERT INTO madevi_audit(actor_id,action,target_id,outcome) VALUES($1,'operations.confirm',$2,'failed')`,[admin.row.id,input.id]);
       return failure("Identitas belum terkonfirmasi.",403);
     }
@@ -130,8 +141,10 @@ async function handlePOST(request:Request) {
     return Response.json({id:input.id,status:"queued"},{status:202,headers});
   } catch(error) {
     await client?.query("ROLLBACK").catch(()=>{});
-    return error instanceof RequestError?failure(error.message,error.status):failure("Permintaan operasi belum tersimpan.",503);
+    return error instanceof RequestError?failure(error.message,error.status):failure("Status pengajuan operasi belum dapat dikonfirmasi.",503);
   } finally {client?.release();}
 }
 
-export const POST=observeRoute("operations.request",handlePOST);
+export const POST=observeRoute("operations.request",apiRoute("/api/admin/operations", "POST",handlePOST));
+
+export const GET=apiRoute("/api/admin/operations", "GET", handleGET);

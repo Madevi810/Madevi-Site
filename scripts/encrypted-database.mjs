@@ -73,7 +73,7 @@ async function decrypt(directory,name,key,output) {
   return size;
 }
 
-export async function backupConfiguration() {
+export async function backupConfiguration({create=true}={}) {
   let settings;
   try {settings=backupSettings();}catch(error){abort(error.message);}
   if(!settings)abort("Siapkan MADEVI_BACKUP_KEY dan direktori absolut MADEVI_BACKUP_DIR.");
@@ -82,7 +82,7 @@ export async function backupConfiguration() {
   if(settings.directory!==directory)abort("Direktori backup harus berupa jalur absolut langsung.");
   const fromCheckout=relative(checkout,directory);
   if(!fromCheckout || (!fromCheckout.startsWith("../") && fromCheckout!==".."))abort("Direktori backup harus di luar checkout Madevi.");
-  await mkdir(directory,{recursive:true,mode:0o700});
+  if(create)await mkdir(directory,{recursive:true,mode:0o700});
   await backupDirectory(directory);
   return {directory,key:Buffer.from(settings.key,"hex")};
 }

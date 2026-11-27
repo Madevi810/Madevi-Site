@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Madevi maintenance hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=madevi-task@maintenance.service
+
+[Install]
+WantedBy=timers.target

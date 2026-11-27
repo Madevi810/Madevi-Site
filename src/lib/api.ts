@@ -22,5 +22,5 @@ export async function readLimitedBody(request:Request,max:number):Promise<Uint8A
   const result=new Uint8Array(size);let offset=0;for(const chunk of chunks){result.set(chunk,offset);offset+=chunk.length}return result;
 }
 export async function bodyJson(request:Request):Promise<unknown>{return JSON.parse(new TextDecoder().decode(await readLimitedBody(request,32000)))}
-export function failure(message:string,status:number) { return NextResponse.json({error:{message}},{status,headers:{"Cache-Control":"no-store"}}); }
+export function failure(message:string,status:number,retryAfter?:number) { return NextResponse.json({error:{message}},{status,headers:{"Cache-Control":"no-store",...(retryAfter?{"Retry-After":String(retryAfter)}:{})}}); }
 

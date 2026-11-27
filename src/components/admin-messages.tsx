@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AdminHeading, AdminLoading, AdminPageNav, adminJson, adminRequest, localDate, useAdminData, value, values } from "./admin-data";
+import { AdminRequestError, AdminHeading, AdminLoading, AdminPageNav, adminJson, adminRequest, localDate, useAdminData, value, values } from "./admin-data";
 import { AdminNotifications } from "./admin-notifications";
 import { adminPanel, fieldLabel, inputControl, primaryButton, statusMessage, textAreaControl, textButton } from "./styles";
 
@@ -20,27 +20,37 @@ export function AdminMessages() {
   const [audience,setAudience]=useState("user"),[title,setTitle]=useState(""),[body,setBody]=useState("");
   const [draftId,setDraftId]=useState<string>(),[preview,setPreview]=useState(false),[pending,setPending]=useState(false),[message,setMessage]=useState("");
   const guard=useRef(false);
+  const [retry,setRetry]=useState<{data:Record<string,unknown>;text:string;done?:()=>void}>();
   const [review,setReview]=useState<{id:string;action:DeliveryAction}>(),[when,setWhen]=useState(""),[confirmed,setConfirmed]=useState(false);
   const delivery=useAdminData<DeliveryPreview>(review?`/api/admin/messages?preview=${review.id}`:"");
   function begin(row:Job,action:DeliveryAction) {
     setReview({id:row.id,action});setConfirmed(false);setWhen("");setMessage("");
   }
-  const list=useAdminData<{jobs:Job[];templates:Template[];hasNext:boolean}>(`/api/admin/messages?page=${page}`);
-  async function apply(data:unknown,text:string,done?:()=>void) {
-    if(guard.current)return;guard.current=true;
+  const list=useAdminData<{jobs:Job[];templates:Template[];hasNext:boolean;worker:{checked_at:string;stale:boolean}|null}>(`/api/admin/messages?page=${page}`);
+  async function apply(data:Record<string,unknown>,text:string,done?:()=>void,repeat=false) {
+    if(guard.current||(retry&&!repeat))return;guard.current=true;
+    const attempt={data:{requestId:crypto.randomUUID(),...data},text,done};
     setPending(true);setMessage("");
     try{
-      const response=await adminRequest<{state?:string}>("/api/admin/messages",adminJson("POST",data));
+      const response=await adminRequest<{state?:string}>("/api/admin/messages",adminJson("POST",attempt.data));
+      setRetry(undefined);
       setMessage(response.state==="sent"?"Pesan terkirim.":response.state==="failed"?"Pengiriman gagal. Lihat riwayat untuk penyebab.":response.state==="cancelled"?"Pekerjaan dibatalkan.":text);list.reload();done?.();
-    }
-    catch(error){setMessage((error as Error).message);}finally{guard.current=false;setPending(false);}
+    } catch(error) {
+      setRetry(error instanceof AdminRequestError&&(error.uncertain||repeat&&error.status===429)?attempt:undefined);
+      setMessage((error as Error).message);
+      if(error instanceof AdminRequestError&&!error.uncertain){list.reload();delivery.reload();}
+    } finally{guard.current=false;setPending(false);}
   }
+  const blocked=pending||Boolean(retry);
   function edit(row?:Job) {
     setJob(row);setDraftId(row?.id);setAudience(row?.audience??"user");setTitle(row?.title??"");setBody(row?.body??"");setPreview(false);
   }
   const sample=(text:string)=>text.replaceAll("{{nama}}","Pengguna Contoh").replaceAll("{{situs}}","Madevi");
   return <><AdminHeading description="Kirim notifikasi di dalam website. Pengiriman email massal belum tersedia.">Notifikasi & Pesan</AdminHeading>
   {message&&<p role="status" className={statusMessage}>{message}</p>}
+  {retry&&<section className={adminPanel}><p>Hasil belum diketahui. Server akan memeriksa permintaan yang sama.</p>
+    <button className={primaryButton} disabled={pending} onClick={()=>void apply(retry.data,retry.text,retry.done,true)}>Periksa dengan coba kembali</button>
+  </section>}
   <section className={adminPanel}><h2>{job?"Ubah draf":"Buat draf pesan"}</h2>
     <p>Variabel yang tersedia adalah <code>{"{{nama}}"}</code> dan <code>{"{{situs}}"}</code>.</p>
     <form className="grid gap-3" key={job?.id??"new"} onSubmit={e=>{
@@ -56,12 +66,14 @@ export function AdminMessages() {
       <label className={fieldLabel}>ID lampiran dari pustaka, opsional<input className={inputControl} name="media" defaultValue={job?.media_id??""} maxLength={36}/></label>
       <button className={textButton} type="button" onClick={()=>setPreview(!preview)} aria-expanded={preview}>Pratinjau</button>
       {preview&&<div className="rounded-lg border border-madevi-line p-4"><strong>{sample(title)||"Judul belum diisi"}</strong><p className="whitespace-pre-wrap">{sample(body)||"Isi belum diisi"}</p></div>}
-      <button className={primaryButton} disabled={pending}>Simpan draf pesan</button>
+      <button className={primaryButton} disabled={blocked}>Simpan draf pesan</button>
       {job&&<button className={textButton} type="button" onClick={()=>edit()}>Batal edit</button>}
     </form>
   </section>
   {!list.data?<AdminLoading error={list.error}/>:<>
   <section className={adminPanel}><h2>Antrean dan riwayat pengiriman</h2>
+    <p>{list.data.worker?list.data.worker.stale?"Pembaruan worker pesan kedaluwarsa. Jadwal menunggu worker.":"Worker pesan telah melapor.": "Worker pesan belum melapor. Jadwal menunggu worker."}{list.data.worker&&` Pemeriksaan terakhir ${localDate(list.data.worker.checked_at)}.`}</p>
+    <button className={textButton} onClick={list.reload}>Muat ulang antrean</button>
     {list.data.jobs.length?list.data.jobs.map(row=><article key={row.id} className="my-3 border-b border-madevi-line pb-3">
       <h3>{row.title}</h3><p>{statuses[row.status]} · {audiences[row.audience]}{row.recipient_id&&` · ${row.recipient_id}`}</p>
       <p>{row.run_at&&`Jadwal ${localDate(row.run_at)} · `}{row.sent_at&&`Terkirim ${localDate(row.sent_at)} · `}{row.deliveries!==null&&`${row.reads} dibaca dari ${row.deliveries} · `}{row.attempts} percobaan</p>
@@ -69,10 +81,10 @@ export function AdminMessages() {
       <details><summary>Lihat isi</summary><p className="whitespace-pre-wrap">{row.body}</p>{row.media_id&&<a href={`/api/media/${row.media_id}`}>Lihat lampiran</a>}</details>
       {row.status==="draft"&&<div className="flex flex-wrap gap-2">
         <button className={textButton} onClick={()=>edit(row)}>Ubah draf</button>
-        <button className={primaryButton} disabled={pending} onClick={()=>begin(row,"send")}>Kirim sekarang</button>
-        <button className={textButton} disabled={pending} onClick={()=>begin(row,"queue")}>Jadwalkan</button>
+        <button className={primaryButton} disabled={blocked} onClick={()=>begin(row,"send")}>Kirim sekarang</button>
+        <button className={textButton} disabled={blocked} onClick={()=>begin(row,"queue")}>Jadwalkan</button>
       </div>}
-      {row.status==="failed"&&row.attempts<5&&<button className={textButton} disabled={pending} onClick={()=>begin(row,"retry")}>Coba lagi</button>}
+      {row.status==="failed"&&row.attempts<5&&<button className={textButton} disabled={blocked} onClick={()=>begin(row,"retry")}>Coba lagi</button>}
       {review?.id===row.id&&<section className="mt-3 rounded-lg border border-madevi-line p-4" aria-label="Konfirmasi pengiriman">
         <h4>Konfirmasi pengiriman</h4>
         {!delivery.data?<p role={delivery.error?"alert":"status"}>{delivery.error??"Menghitung penerima…"}</p>:<>
@@ -81,19 +93,19 @@ export function AdminMessages() {
           <strong>{sample(delivery.data.title)}</strong><p className="whitespace-pre-wrap">{sample(delivery.data.body)}</p>
           {delivery.data.media_id?<a href={`/api/media/${delivery.data.media_id}`}>{delivery.data.media_name??"Lihat lampiran"}</a>:<p>Tanpa lampiran.</p>}
           <form className="grid gap-3" onSubmit={e=>{
-            e.preventDefault();if(!confirmed||pending)return;
+            e.preventDefault();if(!confirmed||blocked)return;
             const runAt=review.action==="queue"?new Date(when):null;
             if(runAt&&(!Number.isFinite(runAt.getTime())||runAt.getTime()<=Date.now())){setMessage("Pilih jadwal setelah waktu sekarang.");return;}
             void apply({action:review.action,id:row.id,runAt:runAt?.toISOString(),expectedUpdated:delivery.data?.updated_at},"Pesan menunggu eksekusi.",()=>setReview(undefined));
           }}>
             {review.action==="queue"?<label className={fieldLabel}>Waktu pengiriman setempat<input className={inputControl} type="datetime-local" required value={when} onChange={e=>{setWhen(e.target.value);setConfirmed(false);}}/></label>:<p>{review.action==="send"?"Server mencoba pengiriman segera.":"Worker mengambil percobaan ulang pada kesempatan berikutnya."}</p>}
             <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Konfirmasi penerima, isi dan waktu</label>
-            <button className={primaryButton} disabled={!confirmed||pending||delivery.data.recipients===0}>Konfirmasi {review.action==="send"?"kirim sekarang":review.action==="queue"?"jadwal":"percobaan ulang"}</button>
+            <button className={primaryButton} disabled={!confirmed||blocked||delivery.data.recipients===0}>Konfirmasi {review.action==="send"?"kirim sekarang":review.action==="queue"?"jadwal":"percobaan ulang"}</button>
           </form>
         </>}
-        <button className={textButton} disabled={pending} onClick={()=>setReview(undefined)}>Tutup konfirmasi</button>
+        <button className={textButton} disabled={blocked} onClick={()=>setReview(undefined)}>Tutup konfirmasi</button>
       </section>}
-      {["draft","scheduled","failed"].includes(row.status)&&<button className={textButton} disabled={pending} onClick={()=>{if(window.confirm("Batalkan pesan ini?"))void apply({action:"cancel",id:row.id},"Pesan dibatalkan.");}}>Batalkan pesan</button>}
+      {["draft","scheduled","failed"].includes(row.status)&&<button className={textButton} disabled={blocked} onClick={()=>{if(window.confirm("Batalkan pesan ini?"))void apply({action:"cancel",id:row.id,expectedUpdated:row.updated_at},"Pesan dibatalkan.");}}>Batalkan pesan</button>}
     </article>):<p>Belum ada pesan.</p>}
     <AdminPageNav page={page} next={list.data.hasNext} move={setPage}/>
   </section>
@@ -104,9 +116,9 @@ export function AdminMessages() {
     }}><label className={fieldLabel}>Nama template<input className={inputControl} name="name" maxLength={100} defaultValue={template?.name} required/></label>
       <label className={fieldLabel}>Judul template<input className={inputControl} name="title" maxLength={160} defaultValue={template?.title} required/></label>
       <label className={fieldLabel}>Isi template<textarea className={textAreaControl} name="body" maxLength={2000} defaultValue={template?.body} required/></label>
-      <button className={primaryButton} disabled={pending}>Simpan template</button>{template&&<button className={textButton} type="button" onClick={()=>setTemplate(undefined)}>Batal edit</button>}
+      <button className={primaryButton} disabled={blocked}>Simpan template</button>{template&&<button className={textButton} type="button" onClick={()=>setTemplate(undefined)}>Batal edit</button>}
     </form>
-    {list.data.templates.map(item=><div className="border-b border-madevi-line py-3" key={item.id}><strong>{item.name}</strong><button className={textButton} onClick={()=>setTemplate(item)}>Ubah template</button><button className={textButton} disabled={pending} onClick={()=>{if(window.confirm("Hapus template ini?"))void apply({action:"removeTemplate",id:item.id},"Template dihapus.");}}>Hapus template</button></div>)}
+    {list.data.templates.map(item=><div className="border-b border-madevi-line py-3" key={item.id}><strong>{item.name}</strong><button className={textButton} onClick={()=>setTemplate(item)}>Ubah template</button><button className={textButton} disabled={blocked} onClick={()=>{if(window.confirm("Hapus template ini?"))void apply({action:"removeTemplate",id:item.id},"Template dihapus.");}}>Hapus template</button></div>)}
   </section>
   </>}
   <details className={adminPanel}><summary>Pengumuman umum untuk pengunjung</summary><AdminNotifications/></details>

@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { Readable } from "node:stream";
 import { z } from "zod";
 import { currentAdmin } from "@/lib/access";
@@ -5,7 +6,7 @@ import { failure } from "@/lib/api";
 import { pool } from "@/lib/db";
 import { openBackup } from "@/lib/backup-artifact";
 
-export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}) {
+async function handleGET(_request:Request,{params}:{params:Promise<{id:string}>}) {
   const admin=await currentAdmin();
   if(!admin||!admin.row.madeviMfa||!admin.row.twoFactorEnabled||admin.row.isDemo)return failure("Diperlukan sesi admin dengan MFA.",403);
   const {id}=await params;
@@ -29,3 +30,5 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
     }});
   } catch {return failure("Artefak tidak tersedia pada direktori unduhan.",503);}
 }
+
+export const GET=apiRoute("/api/admin/operations/artifacts/[id]", "GET", handleGET);

@@ -1,4 +1,6 @@
+import { apiRoute } from "@/lib/api-response";
 import { observeRoute } from "@/lib/monitoring";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { currentAdmin } from "@/lib/access";
 import { failure, bodyJson, sameOrigin } from "@/lib/api";
@@ -11,15 +13,16 @@ const pattern = (max:number) => z.string().trim().min(1).max(max).refine(value =
   return !/[{}]/.test(residual) && value.replaceAll("{{nama}}","x".repeat(80)).replaceAll("{{situs}}","Madevi").length<=max;
 });
 const audience = z.enum(["user","verified","unverified","all"]);
+const requestId=z.uuid().optional();
 const save = z.discriminatedUnion("action",[
-  z.object({action:z.literal("draft"),id:z.uuid(), title:pattern(160), body:pattern(2000), audience, recipientId:z.string().min(1).max(128).optional(), mediaId:z.uuid().optional(), expectedUpdated:z.iso.datetime({offset:true}).optional()}).strict(),
-  z.object({action:z.literal("template"),id:z.uuid(), name:z.string().trim().min(1).max(100), title:pattern(160), body:pattern(2000)}).strict(),
-  z.object({action:z.literal("removeTemplate"),id:z.uuid()}).strict(),
-  z.object({action:z.enum(["queue","send","cancel","retry"]),id:z.uuid(),runAt:z.iso.datetime({offset:true}).optional(),expectedUpdated:z.iso.datetime({offset:true}).optional()}).strict()
+  z.object({action:z.literal("draft"),id:z.uuid(),requestId, title:pattern(160), body:pattern(2000), audience, recipientId:z.string().min(1).max(128).optional(), mediaId:z.uuid().optional(), expectedUpdated:z.iso.datetime({offset:true}).optional()}).strict(),
+  z.object({action:z.literal("template"),id:z.uuid(),requestId, name:z.string().trim().min(1).max(100), title:pattern(160), body:pattern(2000)}).strict(),
+  z.object({action:z.literal("removeTemplate"),id:z.uuid(),requestId}).strict(),
+  z.object({action:z.enum(["queue","send","cancel","retry"]),id:z.uuid(),requestId,runAt:z.iso.datetime({offset:true}).optional(),expectedUpdated:z.iso.datetime({offset:true}).optional()}).strict()
 ]);
 const headers={"Cache-Control":"no-store"};
 
-export async function GET(request:Request) {
+async function handleGET(request:Request) {
   if(!await currentAdmin()) return failure("Tidak diizinkan",403);
   const preview=new URL(request.url).searchParams.get("preview");
   if(preview!==null) {
@@ -35,14 +38,15 @@ export async function GET(request:Request) {
   const parsed=z.coerce.number().int().min(1).max(10000).safeParse(new URL(request.url).searchParams.get("page")??1);
   if(!parsed.success) return failure("Halaman tidak valid",400);
   try {
-    const [jobs,templates] = await Promise.all([
+    const [jobs,templates,worker] = await Promise.all([
       pool.query(`SELECT j.id,j.title,j.body,j.audience,j.recipient_id,j.media_id,j.status,j.run_at,j.sent_at,j.deliveries,j.attempts,j.failure_code,
         date_trunc('milliseconds',j.updated_at) AS updated_at,
         (SELECT count(*)::int FROM madevi_notifications n JOIN madevi_notification_reads r ON r.notification_id=n.id WHERE n.job_id=j.id) AS reads
         FROM madevi_message_jobs j ORDER BY j.updated_at DESC,j.id DESC LIMIT 26 OFFSET $1`,[(parsed.data-1)*25]),
-      pool.query("SELECT id,name,title,body FROM madevi_message_templates ORDER BY name,id")
+      pool.query("SELECT id,name,title,body FROM madevi_message_templates ORDER BY name,id"),
+      pool.query("SELECT checked_at,checked_at<now()-interval '10 minutes' AS stale FROM madevi_worker_status WHERE name='dispatch'")
     ]);
-    return Response.json({jobs:jobs.rows.slice(0,25),hasNext:jobs.rows.length>25,templates:templates.rows},{headers});
+    return Response.json({jobs:jobs.rows.slice(0,25),hasNext:jobs.rows.length>25,templates:templates.rows,worker:worker.rows[0]??null},{headers});
   } catch { return failure("Pesan belum tersedia",503); }
 }
 
@@ -54,12 +58,26 @@ async function handlePOST(request:Request) {
   const data=parsed.data;
   if(data.action==="draft" && (data.audience==="user")!==Boolean(data.recipientId)) return failure("Pilih satu penerima untuk tujuan akun",400);
   if("runAt" in data&&data.action!=="queue"&&data.runAt)return failure("Jadwal hanya untuk tindakan antrekan",400);
-  if(data.action==="queue" && data.runAt && Date.parse(data.runAt)<Date.now()) return failure("Jadwal harus berada di masa depan",400);
+
   let client;
   try {
     client=await pool.connect();
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(7412312)");
+    const signature=createHash("sha256").update(JSON.stringify(data)).digest("hex");
+    if(data.requestId) {
+      const record=(await client.query("SELECT actor_id,job_id,signature FROM madevi_message_requests WHERE id=$1",[data.requestId])).rows[0];
+      if(record) {
+        await client.query("ROLLBACK");
+        if(record.actor_id!==actor.row.id||record.job_id!==data.id||record.signature!==signature)return failure("ID permintaan sudah digunakan untuk perubahan berbeda.",409);
+        client.release();client=undefined;
+        return messageResult(data.action,data.id);
+      }
+    }
+    if(data.action==="queue" && data.runAt && Date.parse(data.runAt)<Date.now()) {
+      await client.query("ROLLBACK");
+      return failure("Jadwal harus berada di masa depan",400);
+    }
     let result;
     if(data.action==="template") {
       result=await client.query(`INSERT INTO madevi_message_templates(id,name,title,body)
@@ -86,20 +104,26 @@ async function handlePOST(request:Request) {
       return failure("Tidak dapat diterapkan. Periksa penerima, status, batas, atau muat versi terkini.",409);
     }
     await client.query("INSERT INTO madevi_audit(actor_id,action,target_id) VALUES($1,$2,$3)",[actor.row.id,`message.${data.action}`,data.id]);
+    if(data.requestId)await client.query("INSERT INTO madevi_message_requests(id,actor_id,job_id,signature) VALUES($1,$2,$3,$4)",
+      [data.requestId,actor.row.id,data.id,signature]);
     await client.query("COMMIT");
-    if(data.action==="send") {
-      client.release();client=undefined;
-      const dispatched=await dispatchMessages(pool,1,data.id).catch(()=>null);
-      const persisted=(!dispatched?.delivered&&!dispatched?.failed
-        ? await pool.query("SELECT status FROM madevi_message_jobs WHERE id=$1",[data.id]).catch(()=>null):null)?.rows[0]?.status;
-      const state=dispatched?.delivered||persisted==="sent"?"sent":dispatched?.failed||persisted==="failed"?"failed":persisted==="cancelled"?"cancelled":"queued";
-      return Response.json({ok:true,state},{headers});
-    }
-    return Response.json({ok:true},{headers});
+    client.release();client=undefined;
+    return messageResult(data.action,data.id);
   } catch(error) {
     await client?.query("ROLLBACK").catch(()=>{});
-    return (error as {code?:string}).code==="23503" ? failure("Lampiran atau akun tidak ditemukan",409) : failure("Pesan belum tersimpan",503);
+    return (error as {code?:string}).code==="23503" ? failure("Lampiran atau akun tidak ditemukan",409) : failure("Status penyimpanan pesan belum dapat dikonfirmasi.",503);
   } finally {client?.release();}
 }
 
-export const POST=observeRoute("messages.write",handlePOST);
+async function messageResult(action:string,id:string) {
+  if(action!=="send")return Response.json({ok:true},{headers});
+  const dispatched=await dispatchMessages(pool,1,id).catch(()=>null);
+  const persisted=(!dispatched?.delivered&&!dispatched?.failed
+    ? await pool.query("SELECT status FROM madevi_message_jobs WHERE id=$1",[id]).catch(()=>null):null)?.rows[0]?.status;
+  const state=dispatched?.delivered||persisted==="sent"?"sent":dispatched?.failed||persisted==="failed"?"failed":persisted==="cancelled"?"cancelled":"queued";
+  return Response.json({ok:true,state},{headers});
+}
+
+export const POST=observeRoute("messages.write",apiRoute("/api/admin/messages", "POST",handlePOST));
+
+export const GET=apiRoute("/api/admin/messages", "GET", handleGET);

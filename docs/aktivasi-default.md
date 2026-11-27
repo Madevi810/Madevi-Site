@@ -64,15 +64,9 @@ Migrasi menampilkan `Migrasi selesai.` jika skema telah dicatat. `check:ready` m
 
 ## 6. Siapkan pekerjaan host
 
-1. Pada mesin operator, buat jadwal yang menjalankan satu putaran antrean dengan root kerja di checkout dan env yang sama dengan lingkungan website. Jalur ini memakai PostgreSQL yang sama. Perintah instalasi Node adalah `npm run jobs:dispatch`. Dari root yang menjalankan Compose gunakan `docker compose run --rm madevi npm run jobs:dispatch`, dengan opsi staging yang sama seperti aplikasi. Contoh jadwal cron untuk interval satu menit adalah:
-
-```cron
-* * * * * cd /srv/madevi-site && /usr/bin/docker compose run --rm madevi npm run jobs:dispatch
-```
-
-2. Uji dari **Notifikasi & Pesan** dengan satu pengguna sintetis. Jadwalkan satu menit ke depan. Sebelum waktu jatuh tempo, pekerjaan tetap terjadwal. Setelah worker berjalan, lihat status pengiriman dan pesan pada akun tujuan. Log worker memuat jumlah pekerjaan terkirim/gagal tanpa isi pesan. Gunakan file log yang dirotasi atau fasilitas logging host dan alarm untuk kegagalan worker.
-3. Ikuti [operasi admin](operasi-admin.md#persiapan-worker-pada-host) untuk `npm run jobs:operations`, backup terenkripsi, target kosong, mount unduhan, dan katalog rollback Compose. Uji alur pengajuan dan pantau riwayat dari admin. Siapkan retensi dan lokasi salinan sesuai sasaran pemulihan.
-4. Pantau liveness dan readiness dari origin tujuan dan uji setidaknya satu alur pendaftaran/email, akses admin, publikasi, lampiran, pengiriman terjadwal, dan pemulihan pada staging. [Panduan admin](admin.md)
+1. Siapkan akun proses, Node 24, klien PostgreSQL, database runtime dan direktori privat pada host Compose. Buat environment worker dari contoh. Siapkan timer systemd untuk pesan, operasi dan pemeliharaan sesuai panduan. Biarkan backup rutin dan alarm kosong sampai interval, kunci dan penerima disetujui. [Persiapan dan pemasangan timer](../ops/systemd/README.md)
+2. Dari root jalankan `npm run ops:ready` dengan environment host. Periksa kelompok konfigurasi, database, akses backup, mount, katalog dan laporan worker. Cocokkan hasil dengan `systemctl list-timers 'madevi-*'` dan journal karena pemeriksaan aplikasi hanya membuktikan laporan yang sudah diterima.
+3. Pada staging, jadwalkan pesan untuk satu akun sintetis satu menit ke depan dan periksa status serta inbox penerima. Ajukan backup dari panel, verifikasi, unduh bila diaktifkan, dan uji restore ke database terpisah. Jalankan retensi dalam mode `dry-run`, simpan salinan backup pada lokasi lain, lalu uji alarm dengan SMTP uji. [Alur admin](operasi-admin.md) dan [pemeriksaan operasi](operasional.md)
 
 ## 7. Kenali kegagalan dan pulihkan
 

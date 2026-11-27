@@ -1,10 +1,11 @@
+import { apiRoute } from "@/lib/api-response";
 import { currentAdmin } from "@/lib/access";
 import { failure } from "@/lib/api";
 import { pool } from "@/lib/db";
 import { monitoredLabels } from "@/lib/monitoring";
 import { checkDatabaseReadiness } from "@/lib/readiness";
 
-export async function GET() {
+async function handleGET() {
   if(!await currentAdmin())return failure("Tidak diizinkan.",403);
   const since=new Date(Math.floor(Date.now()/3600000)*3600000-23*3600000).toISOString();
   try {
@@ -24,7 +25,7 @@ export async function GET() {
       pool.query(`SELECT count(*) FILTER(WHERE status='scheduled' AND run_at<=now())::int AS due,
         count(*) FILTER(WHERE status='scheduled' AND run_at>now())::int AS scheduled,
         count(*) FILTER(WHERE status='failed')::int AS failed FROM madevi_message_jobs`),
-      pool.query("SELECT checked_at,delivered,failed FROM madevi_worker_status WHERE name='dispatch'"),
+      pool.query("SELECT checked_at,delivered,failed,checked_at>now()-interval '10 minutes' AS fresh FROM madevi_worker_status WHERE name='dispatch'"),
       checkDatabaseReadiness(pool)
     ]);
     return Response.json({since,checkedAt:new Date().toISOString(),labels:monitoredLabels,requests:requests.rows,
@@ -32,3 +33,5 @@ export async function GET() {
       dispatch:dispatch.rows[0]??null,database},{headers:{"Cache-Control":"no-store"}});
   } catch {return failure("Data monitoring gagal dibaca.",503);}
 }
+
+export const GET=apiRoute("/api/admin/monitoring", "GET", handleGET);

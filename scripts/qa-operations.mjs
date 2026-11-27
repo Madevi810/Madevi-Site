@@ -24,7 +24,7 @@ export async function operationsFixture(database,container) {
     const rules={pg_dump:'docker exec "$container" pg_dump -U "$PGUSER" -d "$PGDATABASE" "$@"',
       pg_restore:'docker exec -i "$container" pg_restore -U "$PGUSER" "${@:1:$#-1}" < "${!#}"'};
     for(const [name,command] of Object.entries(rules)) {
-      await writeFile(join(bin,name),`#!/usr/bin/env bash\nset -eu\ncontainer=${container}\n${command}\n`,{mode:0o700});
+      await writeFile(join(bin,name),`#!/usr/bin/env bash\nset -eu\ncontainer=${container}\nif [[ "$#" == 1 && "$1" == --version ]]; then exec docker exec "$container" ${name} --version; fi\n${command}\n`,{mode:0o700});
     }
     const configuration={id:"normal",cpus:1,memoryMiB:512};
     const current={id:"current",image:"sha256:"+"a".repeat(64),migrations:migrationVersions};
@@ -58,7 +58,10 @@ export async function verifyOperations({origin,adminCookie,unverifiedCookie,user
   await submit({kind:"backup"},403,userCookie);
   await submit({kind:"backup"},403,unverifiedCookie);
   await invoke();
-  const config=(await read()).worker.capabilities;
+  const snapshot=(await read()).worker;
+  const config=snapshot.capabilities;
+  assert.equal(snapshot.readiness.backup.state,"ready");
+  assert.equal(snapshot.readiness.alert.state,"inactive");
   assert.equal(config.backup,true);
   assert.match(config.restoreTarget,/madevi_restore_/);
   const id=randomUUID();
@@ -81,7 +84,18 @@ export async function verifyOperations({origin,adminCookie,unverifiedCookie,user
   }
   if(browserEnabled) {
     await useOwnerPage(async page=>{
-      await confirmOnPage(page);
+      await page.route("**/api/admin/operations",async route=>{
+        if(route.request().method()!=="POST")return route.continue();
+        const persisted=await route.fetch({maxRetries:0});
+        assert.equal(persisted.status(),202);
+        await route.abort("failed");
+      });
+      await page.getByLabel("Kata sandi admin").fill(password);
+      await page.getByRole("button",{name:"Ajukan operasi"}).click();
+      await page.getByRole("button",{name:"Periksa permintaan yang terputus"}).click();
+      await page.getByText("Permintaan tercatat.",{exact:false}).waitFor();
+      assert.equal(await page.getByLabel("Kata sandi admin").inputValue(),"");
+      await page.unroute("**/api/admin/operations");
       const queued=(await read()).jobs.find(item=>item.kind==="backup"&&item.status==="queued");
       assert.ok(queued);
       const lock=await pool.connect();
@@ -159,5 +173,33 @@ export async function verifyOperations({origin,adminCookie,unverifiedCookie,user
   const recovered=await (await request("/api/admin/monitoring")).json();
   assert.equal(recovered.host.fresh,true);
   assert.ok(recovered.incidents.some(item=>item.source==="worker.heartbeat"&&item.resolved_at));
+  await Promise.all([invoke({MADEVI_ROUTINE_BACKUP_HOURS:"24"}),invoke({MADEVI_ROUTINE_BACKUP_HOURS:"24"})]);
+  await invoke({MADEVI_ROUTINE_BACKUP_HOURS:"24"});
+  const routine=(await pool.query(`SELECT artifact,status,bytes FROM madevi_operations WHERE parameters @> '{"routine":true}'`)).rows;
+  assert.equal(routine.length,1);
+  assert.equal(routine[0].status,"completed");
+  assert.ok(Number(routine[0].bytes)>36);
+  await invoke({MADEVI_BACKUP_DIR:fixture.dir+"/absent"});
+  assert.equal((await read()).worker.readiness.backup.state,"failed");
+  await invoke({MADEVI_BACKUP_DIR:"",MADEVI_BACKUP_KEY:""});
+  assert.equal((await read()).worker.readiness.backup.state,"unconfigured");
+  await invoke();
+  const interrupted=randomUUID();
+  await pool.query(`INSERT INTO madevi_operations(id,kind,status,started_at,phase,progress_at)
+    VALUES($1,'backup','running',now()-interval '12 minutes','dumping',now()-interval '12 minutes')`,[interrupted]);
+  await invoke();
+  const interruptedResult=await state(interrupted,"failed");
+  assert.equal(interruptedResult.phase,"interrupted");
+  assert.match(interruptedResult.details,/Worker terhenti/);
+  const wrongKey=randomUUID();
+  await pool.query(`INSERT INTO madevi_operations(id,kind,status,requested_by,artifact,phase)
+    SELECT $1,'verify','queued',id,$2,'queued' FROM "user" WHERE "madeviRole"='admin'`,[wrongKey,first.artifact]);
+  const altered=fixture.env.MADEVI_BACKUP_KEY[0]==="f"?"e":"f";
+  await assert.rejects(invoke({MADEVI_BACKUP_KEY:altered+fixture.env.MADEVI_BACKUP_KEY.slice(1)}),/exit 1/);
+  const verifyResult=await state(wrongKey,"failed");
+  assert.equal(verifyResult.phase,"failed");
+  assert.match(verifyResult.details,/Integritas backup tidak dapat diverifikasi/);
+  console.log("Lulus: worker menangani status persisten yang terputus dan mencatat kegagalan verifikasi dengan aman.");
+  console.log("Backup rutin menggunakan mesin terenkripsi dan penguncian yang sama. Dua worker menghasilkan satu artefak pada interval yang sama.");
   console.log("Operasi admin lulus pada PostgreSQL 18: MFA, idempotensi, lock, backup, unduh, restore, dan penolakan skema rollback.");
 }

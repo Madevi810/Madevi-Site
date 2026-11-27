@@ -25,11 +25,18 @@ export async function verifyAdminFoundation({origin,adminCookie,userCookie,other
   assert.ok(summary.users.reduce((count,row)=>count+row.count,0)>=3);
   assert.ok(summary.migrations.some(migration=>migration.version.startsWith("004")));
   assert.deepEqual((await read("/api/admin/operations")).jobs,[]);
+  const announcement={id:randomUUID(),audience:"general",title:"Pengumuman uji idempoten",body:"Keterangan sintetis."};
+  await send("/api/admin/notifications",announcement,"POST",201);
+  await send("/api/admin/notifications",announcement);
+  await send("/api/admin/notifications",{...announcement,title:"Judul berbeda"},"POST",409);
   const upload=async visibility=>{
     const form=new FormData();
     form.set("name",`Bukti ${visibility}`);form.set("visibility",visibility);
     form.set("file",new Blob([image],{type:"image/png"}),"bukti.png");
-    return send("/api/admin/media",form,"POST",201);
+    form.set("id",randomUUID());
+    const result=await send("/api/admin/media",form,"POST",201);
+    assert.deepEqual(await send("/api/admin/media",form),result);
+    return result;
   };
   const publicImage=await upload("public"), privateImage=await upload("private");
   assert.equal((await request(`/api/media/${privateImage.id}`,{cookie:""})).status,404);
@@ -146,7 +153,11 @@ export async function verifyAdminFoundation({origin,adminCookie,userCookie,other
   const preview=await read(`/api/admin/messages?preview=${docJob}`);
   assert.equal(preview.recipients,1);
   assert.equal(preview.media_name,"Panduan uji");
-  const sendResult=await send("/api/admin/messages",{action:"send",id:docJob,expectedUpdated:preview.updated_at});
+  const immediate={action:"send",id:docJob,expectedUpdated:preview.updated_at,requestId:randomUUID()};
+  const sendResult=await send("/api/admin/messages",immediate);
+  assert.equal((await send("/api/admin/messages",immediate)).state,"sent");
+  await send("/api/admin/messages",{...immediate,action:"retry"},"POST",409);
+  assert.equal((await read("/api/admin/messages")).jobs.find(row=>row.id===docJob).attempts,1);
   assert.equal(sendResult.state,"sent");
   assert.equal((await request(filePath,outsider)).status,200);
   const renewed=await refreshUser();
@@ -209,8 +220,9 @@ export async function verifyAdminFoundation({origin,adminCookie,userCookie,other
   assert.equal((await userWrite(start)).status,200);
   const sub=`?id=${thread}`;
   const conversation=await read("/api/support"+sub,outsider);
-  assert.equal(conversation.posts.filter(post=>post.sender==="auto").length,1);
+  assert.deepEqual(conversation.posts.map(post=>post.sender),["user","auto"]);
   assert.ok(conversation.posts.some(post=>post.body==="Kami akan membalas saat tersedia."));
+  assert.equal((await userWrite({...start,body:"Isi yang berbeda."})).status,409);
   assert.equal((await request("/api/support"+sub,{cookie:""})).status,401);
   assert.equal((await request("/api/support"+sub,{cookie:renewed})).status,404);
   const moderator="/api/admin/support/conversations";
@@ -221,7 +233,11 @@ export async function verifyAdminFoundation({origin,adminCookie,userCookie,other
   let response=await read("/api/support"+sub,outsider);
   assert.equal(response.thread.status,"waiting_user");
   assert.match(JSON.stringify(response),/Balasan admin pengujian/);
-  assert.equal((await userWrite({action:"reply",id:thread,postId:randomUUID(),version:response.thread.version,body:"Tindak lanjut"})).status,200);
+  const followup={action:"reply",id:thread,postId:randomUUID(),version:response.thread.version,body:"Tindak lanjut"};
+  assert.equal((await userWrite(followup)).status,200);
+  assert.equal((await userWrite(followup)).status,200);
+  assert.equal((await userWrite({...followup,body:"Percobaan isi berbeda"})).status,409);
+  assert.equal((await userWrite({...followup,postId:randomUUID()})).status,409);
   response=await read(moderator+sub);
   assert.equal(response.thread.status,"waiting_admin");
   await send(moderator,{action:"resolve",id:thread,postId:randomUUID(),version:response.thread.version});
@@ -229,6 +245,27 @@ export async function verifyAdminFoundation({origin,adminCookie,userCookie,other
   assert.equal(response.thread.status,"resolved");
   assert.equal(response.posts.filter(post=>post.sender==="auto").length,1);
   assert.equal((await userWrite({action:"reply",id:thread,postId:randomUUID(),version:response.thread.version,body:"Ditolak"})).status,409);
+  if(process.env.MADEVI_TEST_DATABASE_URL) {
+    await db.exec(`INSERT INTO madevi_support_posts(id,thread_id,sender,body)
+      SELECT gen_random_uuid(),'${thread}','admin','Pesan pagination '||n FROM generate_series(1,26) n`);
+    const latest=await read("/api/support"+sub,outsider);
+    assert.equal(latest.posts.length,25);
+    assert.ok(latest.before);
+    await db.exec(`INSERT INTO madevi_support_posts(id,thread_id,sender,body)
+      VALUES(gen_random_uuid(),'${thread}','admin','Sampel baru setelah cursor')`);
+    const earlier=await read("/api/support"+sub+"&before="+latest.before,outsider);
+    assert.deepEqual(earlier.posts.slice(0,2).map(row=>row.sender),["user","auto"]);
+    assert.ok(earlier.posts.every(row=>!latest.posts.some(current=>current.id===row.id)));
+    assert.doesNotMatch(JSON.stringify(earlier),/Catatan admin privat|Sampel baru setelah cursor/);
+  }
+  const reportAttempt={requestId:randomUUID(),message:"Laporan uji kirim berulang."};
+  const firstReport=await request("/api/report",{cookie:otherCookie,method:"POST",data:reportAttempt});
+  assert.equal(firstReport.status,200);
+  const savedReport=await request("/api/report",{cookie:otherCookie,method:"POST",data:reportAttempt});
+  assert.equal(savedReport.status,200);
+  assert.deepEqual(await firstReport.json(),await savedReport.json());
+  const reportConflict=await request("/api/report",{cookie:otherCookie,method:"POST",data:{...reportAttempt,message:"Laporan dengan teks berbeda."}});
+  assert.equal(reportConflict.status,409);
   let monitoring=await read("/api/admin/monitoring");
   for(let i=0;i<10&&!monitoring.requests.length;i++){await new Promise(resolve=>setTimeout(resolve,100));monitoring=await read("/api/admin/monitoring");}
   assert.ok(monitoring.checkedAt&&monitoring.since);

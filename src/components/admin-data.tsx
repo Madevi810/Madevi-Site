@@ -3,10 +3,21 @@
 import { useEffect, useState } from "react";
 import { adminPanel, adminTitle, textButton } from "./styles";
 
+export class AdminRequestError extends Error {
+  constructor(message:string,readonly uncertain:boolean,readonly requestId?:string,readonly status?:number) {
+    super(requestId ? `${message} ID permintaan ${requestId}.` : message);
+  }
+}
+
 export async function adminRequest<T=unknown>(url:string, options?:RequestInit):Promise<T> {
-  const response=await fetch(url,{cache:"no-store",...options});
-  const data=await response.json();
-  if(!response.ok) throw new Error(typeof data.error==="string"?data.error:data.error?.message??"Permintaan gagal.");
+  const response=await fetch(url,{cache:"no-store",...options}).catch(error=>{
+    if(error instanceof Error&&error.name==="AbortError")throw error;
+    throw new AdminRequestError("Koneksi terputus. Hasil tindakan belum diketahui.",true);
+  });
+  const data=await response.json().catch(()=>null);
+  const requestId=response.headers.get("x-request-id")??undefined;
+  if(!response.ok) throw new AdminRequestError(typeof data?.error==="string"?data.error:data?.error?.message??"Permintaan gagal.",response.status>=500,requestId,response.status);
+  if(data===null)throw new AdminRequestError("Respons tidak lengkap. Hasil tindakan belum diketahui.",true,requestId);
   return data;
 }
 export function adminJson(method:string,body:unknown):RequestInit {

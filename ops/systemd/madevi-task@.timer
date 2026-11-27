@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Madevi host task (%i) after the previous run
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

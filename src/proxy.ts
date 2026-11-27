@@ -3,6 +3,7 @@ import { getSessionCookie } from "better-auth/cookies";
 import { auth } from "@/lib/auth-config";
 import { allowApiRequest } from "@/lib/rate-limit";
 import { browserRateId, issueRateCookie, rateCookie, rateCookieAge, trustedClientIp } from "@/lib/rate-identity";
+import { apiError, logApiFailure } from "@/lib/api-response";
 import { securityLog } from "@/lib/security-log";
 
 export async function proxy(request: NextRequest) {
@@ -16,14 +17,19 @@ export async function proxy(request: NextRequest) {
       });
       if (!await allowApiRequest(request, path, cookie, session ? session.user.id : undefined)) {
         securityLog("rate.limited", { outcome: "denied", action: path.startsWith("/api/auth/") ? "auth" : "api", status: 429 });
-        return NextResponse.json({ error: { message: "Terlalu banyak permintaan" } }, {
-          status: 429, headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+        const id = crypto.randomUUID();
+        if (path.startsWith("/api/auth/")) return NextResponse.json({code: "RATE_LIMITED", message: "Terlalu banyak permintaan."}, {
+          status: 429, headers: {"Retry-After": "60", "Cache-Control": "no-store", "x-request-id": id},
         });
+        return apiError(429, id);
       }
     } catch {
-      return NextResponse.json({ error: { message: "Layanan sementara tidak tersedia" } }, {
-        status: 503, headers: { "Cache-Control": "no-store" },
+      const id = crypto.randomUUID();
+      logApiFailure("proxy.api", request.method, id, 503);
+      if (path.startsWith("/api/auth/")) return NextResponse.json({code: "UNAVAILABLE", message: "Layanan sementara tidak tersedia."}, {
+        status: 503, headers: {"Cache-Control": "no-store", "x-request-id": id},
       });
+      return apiError(503, id);
     }
   }
 

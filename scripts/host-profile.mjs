@@ -96,34 +96,42 @@ async function prepareCurrent(releaseId,configurationId) {
   }
 }
 
-async function activate(host,next) {
-  const args=["compose","--project-name",host.catalog.project,
-    "-f",fileURLToPath(new URL("../compose.yml",import.meta.url))];
-  const downloads=fileURLToPath(new URL("../compose.download.yml",import.meta.url));
-  const mount=await lstat(downloads).catch(error=>{if(error.code!=="ENOENT")throw error;return null;});
-  if(mount) {
-    if(!mount.isFile()||await realpath(downloads)!==downloads)fail("Override unduhan harus berkas Compose lokal.");
-    args.push("-f",downloads);
-  }
-  args.push("-f",host.overridePath);
-  await docker(["image","inspect",next.release.image]);
-  await writeProfile(host.overridePath,overrideFor(next));
-  await docker([...args,"up","-d","--no-build","--pull","never","--no-deps","--force-recreate","madevi"]);
-  const container=(await docker([...args,"ps","-q","madevi"])).stdout.trim();
-  if(!/^[0-9a-f]{12,64}$/.test(container))fail("Container Madevi tidak ditemukan setelah perpindahan.");
-  if((await docker(["inspect","--format","{{.Image}}",container])).stdout.trim()!==next.release.image)fail("Image aktif berbeda dari katalog.");
-  for(let attempt=0;attempt<12;attempt++) {
-    try {
-      const result=await Promise.all(["live","ready"].map(path=>fetch(`http://127.0.0.1:3000/api/health/${path}`,{redirect:"error",signal:AbortSignal.timeout(2500)})));
-      if(result.every(response=>response.ok)) {
-        await writeProfile(host.statePath,next);
-        return;
-      }
-    } catch {}
-    await new Promise(resolve=>setTimeout(resolve,2500));
-  }
-  fail("Probe live dan ready belum lulus.");
+export function createHostActivator({
+  composeFile=fileURLToPath(new URL("../compose.yml",import.meta.url)),
+  downloads=fileURLToPath(new URL("../compose.download.yml",import.meta.url)),
+  probeOrigin="http://127.0.0.1:3000",
+  attempts=12,retryMs=2500,
+}={}) {
+  return async function activate(host,next) {
+    const args=["compose","--project-name",host.catalog.project,
+      "-f",composeFile];
+    const mount=downloads&&await lstat(downloads).catch(error=>{if(error.code!=="ENOENT")throw error;return null;});
+    if(mount) {
+      if(!mount.isFile()||await realpath(downloads)!==downloads)fail("Override unduhan harus berkas Compose lokal.");
+      args.push("-f",downloads);
+    }
+    args.push("-f",host.overridePath);
+    await docker(["image","inspect",next.release.image]);
+    await writeProfile(host.overridePath,overrideFor(next));
+    await docker([...args,"up","-d","--no-build","--pull","never","--no-deps","--force-recreate","madevi"]);
+    const container=(await docker([...args,"ps","-q","madevi"])).stdout.trim();
+    if(!/^[0-9a-f]{12,64}$/.test(container))fail("Container Madevi tidak ditemukan setelah perpindahan.");
+    if((await docker(["inspect","--format","{{.Image}}",container])).stdout.trim()!==next.release.image)fail("Image aktif berbeda dari katalog.");
+    for(let attempt=0;attempt<attempts;attempt++) {
+      try {
+        const result=await Promise.all(["live","ready"].map(path=>fetch(`${probeOrigin}/api/health/${path}`,{redirect:"error",signal:AbortSignal.timeout(2500)})));
+        if(result.every(response=>response.ok)) {
+          await writeProfile(host.statePath,next);
+          return;
+        }
+      } catch {}
+      await new Promise(resolve=>setTimeout(resolve,retryMs));
+    }
+    fail("Probe live dan ready belum lulus.");
+  };
 }
+
+const activate=createHostActivator();
 
 export async function runHostRollback({host,kind,artifact,target,revision,client,progress,activateProfile=activate}) {
   if(!host)fail("Katalog atau profil aktif host belum tersedia.");

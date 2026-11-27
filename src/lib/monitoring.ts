@@ -1,7 +1,6 @@
 import "server-only";
 import { after } from "next/server";
 import { pool } from "./db";
-import { failure } from "./api";
 
 export const monitoredLabels={
   "operations.request":"Permintaan operasi admin",
@@ -14,13 +13,12 @@ export const monitoredLabels={
   "report.write":"Pengiriman laporan",
 } as const;
 
-let cleanupHour=0;
 let failureHour=0;
 
 export function observeRoute<Args extends unknown[]>(route:keyof typeof monitoredLabels,handler:(...args:Args)=>Promise<Response>) {
   return async (...args:Args) => {
     const start=performance.now();
-    const result=await handler(...args).catch(()=>failure("Layanan sementara tidak tersedia.",503));
+    const result=await handler(...args);
     const ms=Math.min(3600000,Math.max(0,Math.round(performance.now()-start)));
     const outcome=result.status>=500?"error":result.status>=400?"client":"ok";
     // The handler already produced its HTTP status. Keep metrics failures outside that response.
@@ -36,11 +34,6 @@ export function observeRoute<Args extends unknown[]>(route:keyof typeof monitore
             failureHour=hour;
             console.warn(JSON.stringify({event:"monitoring.storage_unavailable",code:/^[0-9A-Z]{5}$/.test(error.code??"")?error.code:"unavailable"}));
           });
-        const hour=Math.floor(Date.now()/3600000);
-        if(hour!==cleanupHour) {
-          cleanupHour=hour;
-          await pool.query("DELETE FROM madevi_monitor_buckets WHERE hour<now()-interval '7 days'").catch(()=>{});
-        }
       });
     } catch {}
     return result;

@@ -1,10 +1,11 @@
+import { apiRoute } from "@/lib/api-response";
 import { z } from "zod";
 import { currentAdmin } from "@/lib/access";
 import { bodyJson, failure, sameOrigin, slug } from "@/lib/api";
 import { ContentError, copyRevision, listRevisions } from "@/lib/content";
 
 type Params = {params:Promise<{id:string}>};
-export async function GET(request:Request,{params}:Params) {
+async function handleGET(request:Request,{params}:Params) {
   const admin=await currentAdmin();
   if (!admin) return failure("Tidak diizinkan",403);
   const {id}=await params;
@@ -17,7 +18,7 @@ const input=z.union([
   z.object({revision:z.number().int().positive(),slug}).strict(),
   z.object({revision:z.number().int().positive(),expectedRevision:z.number().int().positive()}).strict(),
 ]);
-export async function POST(request:Request,{params}:Params) {
+async function handlePOST(request:Request,{params}:Params) {
   const admin=await currentAdmin();
   if (!admin || !sameOrigin(request)) return failure("Tidak diizinkan",403);
   const {id}=await params;
@@ -26,3 +27,6 @@ export async function POST(request:Request,{params}:Params) {
   try { return Response.json(await copyRevision({id:admin.row.id,role:"admin"},id,data.data)); }
   catch(error) { return error instanceof ContentError ? failure(error.message,error.status) : failure("Draf belum disimpan",503); }
 }
+
+export const GET=apiRoute("/api/admin/content/[id]/revisions", "GET", handleGET);
+export const POST=apiRoute("/api/admin/content/[id]/revisions", "POST", handlePOST);

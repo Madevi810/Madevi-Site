@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { currentAdmin } from "@/lib/access";
 import { failure } from "@/lib/api";
 import { accountStatus } from "@/lib/account-status";
@@ -5,7 +6,7 @@ import { pool } from "@/lib/db";
 import { googleSettings, smtpSettings } from "@/lib/env";
 import { checkDatabaseReadiness } from "@/lib/readiness";
 
-export async function GET() {
+async function handleGET() {
   if(!await currentAdmin()) return failure("Tidak diizinkan",403);
   try {
     const [users,content,reports,audit,usage,events,latest,readiness,jobs,worker]=await Promise.all([
@@ -26,3 +27,5 @@ export async function GET() {
     return Response.json({users:users.rows,content:content.rows,reports:reports.rows,audit:audit.rows,usage:usage.rows[0],events:events.rows,migrations:latest.rows,readiness,jobs:jobs.rows,worker:worker.rows[0]??null,integrations:{smtp:Boolean(smtpSettings()),google:Boolean(googleSettings())},sampledAt:new Date().toISOString()},{headers:{"Cache-Control":"no-store"}});
   } catch {return failure("Ringkasan tidak dapat dibaca",503);}
 }
+
+export const GET=apiRoute("/api/admin/summary", "GET", handleGET);

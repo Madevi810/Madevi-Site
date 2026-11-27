@@ -29,6 +29,8 @@ export async function smokeBuiltApplication(env, db, exerciseOutage) {
         method: "POST", headers: { origin: "https://localhost", "content-type": "application/json" }, body: "{}",
       });
       assert.equal(disabled.status, 503, "unconfigured email operation");
+      assert.ok(disabled.headers.get("x-request-id"));
+      if(path==="/api/register")assert.equal((await disabled.json()).error.code,"UNAVAILABLE");
     }
     assert.equal((await response("/api/admin/users")).status, 403);
     if (exerciseOutage) {
@@ -128,4 +130,29 @@ export async function verifyUnavailableDatabase(env) {
   assert.equal(code, 1);
   assert.match(output, /Database belum siap/);
   assert.doesNotMatch(output, /sentinel-password|postgresql:\/\//);
+  if(process.env.MADEVI_TEST_BUILD!=="1")return;
+  const app=spawn(process.execPath,["node_modules/next/dist/bin/next","start","--hostname","127.0.0.1","--port","3001"],{
+    env:{...env,NODE_ENV:"production",MADEVI_ENV:"staging",MADEVI_DEMO_MODE:"false",BETTER_AUTH_URL:"https://localhost",
+      DATABASE_URL:"postgresql://local-only:sentinel-password@127.0.0.1:1/madevi_ci_unavailable"},stdio:"ignore"
+  });
+  try {
+    const origin="http://127.0.0.1:3001";
+    let alive=false;
+    for(let attempt=0;attempt<20;attempt++){
+      alive=Boolean((await fetch(origin+"/api/health/live",{signal:AbortSignal.timeout(1000)}).catch(()=>null))?.ok);
+      if(alive)break;
+      await delay(250);
+    }
+    assert.ok(alive);
+    const request=await fetch(origin+"/api/account/avatar",{headers:{"x-request-id":"untrusted-fixture"},signal:AbortSignal.timeout(8000)});
+    assert.equal(request.status,503);
+    const data=await request.json();
+    assert.equal(data.error.code,"UNAVAILABLE");
+    assert.equal(data.requestId,request.headers.get("x-request-id"));
+    assert.doesNotMatch(JSON.stringify(data),/sentinel-password|untrusted-fixture|postgresql/);
+    console.log("Lulus: API runtime tetap memberi HTTP 503 dengan kode aman ketika database tidak dapat dihubungi.");
+  } finally {
+    if(app.exitCode===null&&app.signalCode===null){const done=once(app,"close");app.kill("SIGTERM");await done;}
+  }
+
 }

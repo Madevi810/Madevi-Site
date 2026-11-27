@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { observeRoute } from "@/lib/monitoring";
 import { z } from "zod";
 import { currentAccount } from "@/lib/access";
@@ -28,4 +29,4 @@ async function handleGET(_request:Request,{params}:{params:Promise<{id:string}>}
   } catch {return failure("Media sementara tidak tersedia",503);}
 }
 
-export const GET=observeRoute("library.read",handleGET);
+export const GET=observeRoute("library.read",apiRoute("/api/media/[id]", "GET",handleGET));

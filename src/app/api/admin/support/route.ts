@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { currentAdmin } from "@/lib/access";
@@ -8,12 +9,12 @@ const rule=z.object({
   id:z.uuid().optional(),keyword:z.string().trim().max(100),response:z.string().trim().min(1).max(2000),
   startsAt:z.iso.datetime().nullable(),endsAt:z.iso.datetime().nullable(),enabled:z.boolean(),
 }).strict().refine(v=>!v.startsAt||!v.endsAt||Date.parse(v.startsAt)<Date.parse(v.endsAt));
-export async function GET() {
+async function handleGET() {
   if(!await currentAdmin())return failure("Tidak diizinkan",403);
   try {return Response.json({rules:(await pool.query("SELECT * FROM madevi_support_rules ORDER BY keyword NULLS LAST,id LIMIT 100")).rows},{headers:{"Cache-Control":"no-store"}});}
   catch{return failure("Aturan belum tersedia",503);}
 }
-export async function PUT(request:Request) {
+async function handlePUT(request:Request) {
   const admin=await currentAdmin();
   if(!admin||!sameOrigin(request))return failure("Tidak diizinkan",403);
   const input=rule.safeParse(await bodyJson(request).catch(()=>null));
@@ -38,3 +39,6 @@ export async function PUT(request:Request) {
   } catch {await client?.query("ROLLBACK").catch(()=>{});return failure("Aturan belum tersimpan",503);}
   finally {client?.release();}
 }
+
+export const GET=apiRoute("/api/admin/support", "GET", handleGET);
+export const PUT=apiRoute("/api/admin/support", "PUT", handlePUT);

@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { observeRoute } from "@/lib/monitoring";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
@@ -7,7 +8,7 @@ import { bodyJson, failure, readLimitedBody, sameOrigin } from "@/lib/api";
 import { pool } from "@/lib/db";
 import { documentType, isDocumentName, libraryMaxFile, libraryMaxTotal } from "@/lib/library-file";
 
-export async function GET(request:Request) {
+async function handleGET(request:Request) {
   if(!await currentAdmin()) return failure("Tidak diizinkan",403);
   const page=z.coerce.number().int().min(1).max(1000).safeParse(new URL(request.url).searchParams.get("page")??1);
   if(!page.success)return failure("Halaman tidak valid",400);
@@ -22,11 +23,12 @@ export async function GET(request:Request) {
 async function handlePOST(request:Request) {
   const admin=await currentAdmin();
   if(!admin || !sameOrigin(request)) return failure("Tidak diizinkan",403);
-  let stored:Buffer, name:string, visibility:string, mime:string;
+  let stored:Buffer, name:string, visibility:string, mime:string,id:string;
   try {
     const bytes=await readLimitedBody(request,2200000);
     const form=await new Response(new Uint8Array(bytes).buffer,{headers:{"content-type":request.headers.get("content-type")??""}}).formData();
     const item=form.get("file");
+    id=z.uuid().nullable().parse(form.get("id"))??randomUUID();
     name=z.string().trim().min(1).max(120).parse(form.get("name"));
     visibility=z.enum(["public","private"]).parse(form.get("visibility"));
     if(!(item instanceof File)||item.size===0||item.size>libraryMaxFile)throw new Error();
@@ -45,9 +47,17 @@ async function handlePOST(request:Request) {
   } catch {return failure("Gunakan JPEG, PNG, WebP, PDF, TXT UTF-8, atau CSV UTF-8 tanpa formula, sampai 2 MB.",400);}
   let client;
   try {
-    const id=randomUUID();
     client=await pool.connect();await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(7412314)");
+    const existing=(await client.query(`SELECT created_by,name,mime_type,visibility,data=$2::bytea AS same
+      FROM madevi_library WHERE id=$1`,[id,stored])).rows[0];
+    if(existing) {
+      await client.query("ROLLBACK");
+      if(existing.created_by!==admin.row.id||existing.name!==name||existing.visibility!==visibility||existing.mime_type!==mime||!existing.same) {
+        return failure("ID berkas sudah dipakai untuk unggahan berbeda.",409);
+      }
+      return Response.json({id,mime});
+    }
     const result=await client.query(`WITH inserted AS (
       INSERT INTO madevi_library(id,name,mime_type,visibility,data,created_by)
       SELECT $1,$2,$3,$4,$5,$6 WHERE (SELECT coalesce(sum(byte_size),0) FROM madevi_library)+$7<=$8 RETURNING id
@@ -55,11 +65,11 @@ async function handlePOST(request:Request) {
     [id,name,mime,visibility,stored,admin.row.id,stored.length,libraryMaxTotal]);
     await client.query("COMMIT");
     return result.rowCount?Response.json({id,mime},{status:201}):failure("Pustaka mencapai batas 256 MB.",409);
-  } catch {await client?.query("ROLLBACK").catch(()=>{});return failure("Media belum disimpan",503);}
+  } catch {await client?.query("ROLLBACK").catch(()=>{});return failure("Status unggahan belum dapat dikonfirmasi.",503);}
   finally {client?.release();}
 }
 
-export async function DELETE(request:Request) {
+async function handleDELETE(request:Request) {
   const admin=await currentAdmin();
   if(!admin || !sameOrigin(request))return failure("Tidak diizinkan",403);
   const data=z.object({id:z.uuid()}).strict().safeParse(await bodyJson(request).catch(()=>null));
@@ -73,4 +83,7 @@ export async function DELETE(request:Request) {
   }
 }
 
-export const POST=observeRoute("library.upload",handlePOST);
+export const POST=observeRoute("library.upload",apiRoute("/api/admin/media", "POST",handlePOST));
+
+export const GET=apiRoute("/api/admin/media", "GET", handleGET);
+export const DELETE=apiRoute("/api/admin/media", "DELETE", handleDELETE);

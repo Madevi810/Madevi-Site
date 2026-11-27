@@ -215,6 +215,10 @@ export async function verifyAdminWorkflowUI({browser,origin,adminCookie,userCook
 
     await panel("rules");
     await page.getByLabel("Mode ketersediaan",{exact:true}).selectOption("unavailable");
+    await page.getByRole("button",{name:"Tambah rentang"}).click();
+    await page.getByLabel("Hari 1").selectOption("2");
+    await page.getByLabel("Mulai",{exact:true}).fill("08:30");
+    await page.getByLabel("Akhir hari").check();
     await page.getByLabel("Jawaban saat admin tidak tersedia").fill("Admin sedang di luar jadwal pengujian.");
     await page.getByRole("button",{name:"Simpan ketersediaan"}).click();
     await page.getByText("Ketersediaan tersimpan.").waitFor();
@@ -235,8 +239,19 @@ export async function verifyAdminWorkflowUI({browser,origin,adminCookie,userCook
     await user.getByText("Balasan browser kepada pengguna.",{exact:true}).waitFor();
     assert.equal(await user.getByText("Catatan browser yang rahasia.",{exact:true}).count(),0);
     await user.getByLabel("Balasan",{exact:true}).fill("Tindak lanjut melalui browser.");
+    let interrupted=false;
+    await user.route("**/api/support",async route=>{
+      if(interrupted||route.request().method()!=="POST")return route.continue();
+      interrupted=true;
+      const stored=await route.fetch({maxRetries:0});
+      assert.equal(stored.status(),200);
+      await route.abort("failed");
+    });
     await user.getByRole("button",{name:"Kirim balasan"}).click();
-    await user.getByText("Tindak lanjut melalui browser.",{exact:true}).waitFor();
+    await user.getByRole("button",{name:"Periksa dengan coba kembali"}).click();
+    await user.getByText("Perubahan percakapan tersimpan.",{exact:true}).waitFor();
+    assert.equal(await user.getByText("Tindak lanjut melalui browser.",{exact:true}).count(),1);
+    await user.unroute("**/api/support");
     await page.getByRole("button",{name:"Muat ulang percakapan"}).click();
     await page.getByText("Tindak lanjut melalui browser.",{exact:true}).waitFor();
     page.once("dialog",dialog=>dialog.accept());

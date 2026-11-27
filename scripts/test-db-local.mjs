@@ -1,12 +1,18 @@
 // Local-only integration test. PGlite is an optional test dependency, not the production database.
 import { PGlite } from "@electric-sql/pglite";
 import { createServer } from "pglite-server";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import net from "node:net";
 import pg from "pg";
+import { alertSettings } from "./alarm-settings.mjs";
+import { maintain } from "./maintenance.mjs";
+import { smtpAlarm } from "./operational-alarm.mjs";
 import { databaseUrl } from "../src/lib/env.ts";
 import { operationsFixture, verifyOperations } from "./qa-operations.mjs";
 import { verifyAdminFoundation } from "./qa-admin-foundation.mjs";
@@ -25,6 +31,15 @@ const env={...process.env,DATABASE_URL:external||"postgresql://postgres:postgres
 function run(args,variables=env){return new Promise((resolve,reject)=>{const p=spawn("node",args,{env:variables,stdio:"inherit"});p.on("close",c=>c===0?resolve():reject(new Error(`exit ${c}`)));p.on("error",reject);});}
 let app,opsFixture;
 try {
+  if(external) {
+    const config=alertSettings({...env,MADEVI_ALERT_TO:"ops@example.invalid",MADEVI_OPS_STATE_DIR:"/tmp"});
+    await smtpAlarm(config,"readiness","opened");
+    await smtpAlarm(config,"readiness","recovered");
+    assert.match(mail.at(-2),/Gangguan/);
+    assert.match(mail.at(-1),/Pemulihan/);
+    mail.length=0;
+    console.log("Lulus: alarm gangguan dan pulih terkirim ke SMTP sintetis loopback.");
+  }
   if(external&&process.env.MADEVI_TEST_DOCKER_CONTAINER) {
     opsFixture=await operationsFixture(external,process.env.MADEVI_TEST_DOCKER_CONTAINER);
     env.MADEVI_BACKUP_DOWNLOAD_DIR=opsFixture.dir;
@@ -33,6 +48,27 @@ try {
   await run(["scripts/migrate.mjs"]);await run(["scripts/migrate.mjs"]);
   await run(["scripts/migrate.mjs","--down"],{...env,ALLOW_SCHEMA_ROLLBACK:"true"});await run(["scripts/migrate.mjs"]);
   await run(["scripts/seed-demo.mjs"]);
+  if(external) {
+    const client=await realPool.connect();
+    try {
+      const version="006_operational_reliability";
+      const migration=direction=>readFile(new URL(`./migrations/${version}.${direction}.sql`,import.meta.url),"utf8");
+      const thread=randomUUID();
+      await client.query("BEGIN");
+      await client.query(await migration("down"));
+      await client.query(`INSERT INTO madevi_support_threads(id,user_id,title)
+        SELECT $1,id,'Percakapan sebelum migrasi' FROM "user" WHERE username='madevi-user'`,[thread]);
+      await client.query(`INSERT INTO madevi_support_posts(id,thread_id,sender,body,created_at)
+        VALUES ('00000000-0000-4000-8000-000000000001',$1,'auto','Balasan lama',now()),
+          ('ffffffff-ffff-4fff-8fff-ffffffffffff',$1,'user','Pertanyaan lama',now())`,[thread]);
+      await client.query(await migration("up"));
+      await client.query("INSERT INTO madevi_support_posts(id,thread_id,sender,body) VALUES($1,$2,'admin','Balasan baru')",[randomUUID(),thread]);
+      const history=await client.query("SELECT sender FROM madevi_support_posts WHERE thread_id=$1 ORDER BY event_order",[thread]);
+      assert.deepEqual(history.rows,[{sender:"user"},{sender:"auto"},{sender:"admin"}]);
+      console.log("Lulus: migrasi mengurutkan pertanyaan lama sebelum balasan otomatis bertimestamp sama dan melanjutkan urutan.");
+    } finally {await client.query("ROLLBACK").catch(()=>{});client.release();}
+  }
+
   await run(["scripts/check-ready.mjs"]);
   const rollbackWithAccount=spawn("node",["scripts/migrate.mjs","--down"],{env:{...env,ALLOW_SCHEMA_ROLLBACK:"true"},stdio:"ignore"});assert.notEqual(await new Promise(resolve=>rollbackWithAccount.on("close",resolve)),0,"rollback with accounts and no content must fail");
   if(process.env.MADEVI_TEST_BUILD==="1"){
@@ -40,6 +76,26 @@ try {
     await smokeBuiltApplication(env, db, Boolean(external));
   }
   await verifyUnavailableDatabase(env);
+  if(external) {
+    // App is stopped at this point and its PostgreSQL endpoint is deliberately unreachable.
+    const directory=await mkdtemp(join(tmpdir(),"madevi-alarm-fixture-"));
+    try {
+      const independent={...env,MADEVI_ALERT_TO:"ops@example.invalid",MADEVI_OPS_STATE_DIR:directory,MADEVI_ALERT_FAILURES:"2",
+        DATABASE_URL:"postgresql://fixture:local-only@127.0.0.1:1/madevi_ci_unavailable"};
+      await run(["scripts/operational-alarm.mjs"],independent);
+      assert.equal(mail.length,0);
+      await run(["scripts/operational-alarm.mjs"],independent);
+      await run(["scripts/operational-alarm.mjs"],independent);
+      assert.equal(mail.length,1);
+      assert.match(mail[0],/Readiness aplikasi dari host/);
+      const state=JSON.parse(await readFile(join(directory,"alarm-state.json"),"utf8"));
+      assert.equal(state.readiness.notified,true);
+      assert.equal(state.dispatch,undefined);
+      console.log("Lulus: alarm host menyimpan status dan tidak mengulang saat PostgreSQL tidak dapat dihubungi.");
+      mail.length=0;
+    } finally {await rm(directory,{recursive:true,force:true});}
+  }
+
   app=spawn("node",["node_modules/next/dist/bin/next","dev","--hostname","127.0.0.1","--port","3000"],{env,stdio:["ignore","pipe","pipe"]});
   app.stdout.resume(); app.stderr.resume();
   let ready=false; for(let n=0;n<45;n++){try{const r=await fetch("http://127.0.0.1:3000/");if(r.ok){ready=true;break}}catch{}await new Promise(resolve=>setTimeout(resolve,1000))} if(!ready)throw new Error("Aplikasi uji gagal dimulai");
@@ -212,7 +268,26 @@ try {
   assert.equal((await fetch(`${origin}/api/admin/users`,{headers:{cookie:mfaCookie}})).status,200,"admin with MFA can access admin data");
   if(opsFixture)await verifyOperations({origin,adminCookie:mfaCookie,unverifiedCookie:adminCookie,userCookie:learnerCookie,
     password:env.DEMO_PASSWORD,fixture:opsFixture,pool:realPool,browserEnabled:process.env.MADEVI_VISUAL_CHECK==="1"||process.env.MADEVI_TEST_OPERATIONS_UI==="1",
-    invoke:()=>run(["scripts/run-operations.mjs"],{...env,...opsFixture.env})});
+    invoke:(extra={})=>run(["scripts/run-operations.mjs"],{...env,...opsFixture.env,...extra})});
+  if(external) {
+    const settings={mode:"dry-run",batch:1,limits:7,metrics:7,backupDays:30};
+    await realPool.query(`INSERT INTO madevi_rate_limits(key,window_start,hits) VALUES
+      ('qa-retention-old-a',now()-interval '9 days',1),('qa-retention-old-b',now()-interval '8 days',1),
+      ('qa-retention-fresh',now()-interval '6 days',1)`);
+    await realPool.query(`INSERT INTO madevi_monitor_buckets(hour,route,result,count,total_ms,max_ms)
+      VALUES(now()-interval '9 days','qa-retention','ok',1,1,1)`);
+    const durable=(await realPool.query("SELECT count(*)::int AS n FROM madevi_audit")).rows[0].n;
+    const snapshot=await maintain(realPool,settings);
+    assert.equal(snapshot.rate_limits,1);
+    assert.equal(snapshot.monitor_buckets,1);
+    assert.deepEqual(await maintain(realPool,{...settings,mode:"prune"}),{...snapshot,mode:"prune"});
+    assert.equal((await maintain(realPool,{...settings,mode:"prune"})).rate_limits,1);
+    assert.equal((await maintain(realPool,{...settings,mode:"prune"})).rate_limits,0);
+    assert.deepEqual((await realPool.query("SELECT key FROM madevi_rate_limits WHERE key LIKE 'qa-retention-%'")).rows,[{key:"qa-retention-fresh"}]);
+    assert.ok((await realPool.query("SELECT count(*)::int AS n FROM madevi_audit")).rows[0].n>=durable);
+    console.log("Lulus: retensi PostgreSQL per batch, dry-run, batas umur, pengulangan dan perlindungan audit.");
+  }
+
   await db.exec(`UPDATE "session" SET "madeviMfa"=false WHERE "userId"=(SELECT id FROM "user" WHERE username='madevi-admin')`);
   assert.ok(await (await fetch(`${origin}/api/auth/get-session`,{headers:{cookie:mfaCookie}})).json(), "legacy-style session still authenticates");
   assert.equal((await fetch(`${origin}/api/admin/users`,{headers:{cookie:mfaCookie}})).status,403,"MFA-enabled account needs proof on its individual session");

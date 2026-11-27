@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { getSessionCookie } from "better-auth/cookies";
 import { toNextJsHandler } from "better-auth/next-js";
 import { auth } from "@/lib/auth-config";
@@ -29,13 +30,13 @@ async function privilegedGuard(request: Request, path: string) {
   return Response.json({ error: "Masuk kembali dengan kata sandi dan autentikator." }, { status: 403 });
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const path = new URL(request.url).pathname.replace(/\/+$/, "");
   if (path.startsWith("/api/auth/reset-password/")) return Response.json({ error: "Gunakan OTP email." }, { status: 403 });
   try { return await privilegedGuard(request, path) || await handlers.GET(request); }
   catch { return Response.json({ error: "Autentikasi sementara tidak tersedia." }, { status: 503 }); }
 }
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const requestedPath=new URL(request.url).pathname.replace(/\/+$/, "");
   if (!requestedPath.startsWith("/api/auth/callback/") && !sameOrigin(request)) {
     return Response.json({ error: "Permintaan tidak valid." }, { status: 403 });
@@ -90,3 +91,5 @@ export async function POST(request: Request) {
   return response;
 }
 
+export const GET=apiRoute("/api/auth/[...all]","GET",handleGET,true);
+export const POST=apiRoute("/api/auth/[...all]","POST",handlePOST,true);

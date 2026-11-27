@@ -26,6 +26,8 @@ export function PublicShell({page,roomName,contentTitle,paragraphs=[],section,na
   const [noticeCategory,setNoticeCategory]=useState<"general"|"system">("general");
   const [reportOpen, setReportOpen] = useState(false);
   const [reportMessage, setReportMessage] = useState("");
+  const reportPending=useRef(false),reportAttempt=useRef<FormData|null>(null);
+  const [reportBusy,setReportBusy]=useState(false),[reportUncertain,setReportUncertain]=useState(false);
   const [reportPhoto, setReportPhoto] = useState<File | null>(null);
   const [reportPreview, setReportPreview] = useState("");
   useEffect(() => {
@@ -141,24 +143,25 @@ export function PublicShell({page,roomName,contentTitle,paragraphs=[],section,na
               "--accent": r.color
             } as React.CSSProperties}><span className={roomPillIcon}><r.icon size={19} /></span><strong className={roomPillText}>{r.name}</strong><ArrowUpRight className="text-madevi-muted" size={16} /></Link>)}</nav><div className="flex-none pb-madevi-16 pt-madevi-8"><div className="grid grid-cols-(--madevi-developer-grid) gap-madevi-14 rounded-madevi-20 border border-madevi-line p-madevi-16 compact:grid-cols-(--madevi-developer-grid-mobile) compact:gap-madevi-10 compact:p-madevi-12 short:grid-cols-(--madevi-developer-grid-short) short:p-madevi-10"><img className="h-madevi-60 w-madevi-60 rounded-madevi-15 object-cover compact:h-madevi-50 compact:w-madevi-50 short:h-madevi-42 short:w-madevi-42" src="/images/developer-art.png" alt="" /><div><strong className="block text-madevi-13 compact:text-madevi-11">PLATFORM MADEVI</strong><span className="mt-madevi-4 block text-madevi-11 text-madevi-muted">Patch {VERSION}</span><small className="mt-madevi-4 block text-madevi-11 text-madevi-muted">{t("Tautan sosial belum tersedia", "Social links are not available yet")}</small></div><div className="col-span-2 flex justify-center gap-madevi-22 compact:gap-madevi-20 short:gap-madevi-18"><span role="img" className="grid h-madevi-28 w-madevi-28 place-items-center text-madevi-text" aria-label="TikTok"><svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M16.6 1c.3 2.4 1.7 3.8 4 4v3.1a8.5 8.5 0 0 1-4-1.1v7.2c0 4.8-2.7 7-6.1 7-3.1 0-5.5-2.1-5.5-5.3 0-3.1 2.4-5.6 6.1-5.4v3.2c-1.8-.3-3 .7-3 2.2 0 1.3 1 2.2 2.2 2.2 1.7 0 2.8-1 2.8-3.9V1h3.5Z" /></svg></span><span role="img" className="grid h-madevi-28 w-madevi-28 place-items-center text-madevi-text" aria-label="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></span><span role="img" className="grid h-madevi-28 w-madevi-28 place-items-center text-madevi-text" aria-label="YouTube"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4" /><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none" /></svg></span></div></div><button className="mt-madevi-12 flex h-madevi-47 w-full items-center justify-center gap-madevi-9 rounded-madevi-50 border-0 bg-madevi-soft font-bold short:h-madevi-38" onClick={() => {
               setReportOpen(true);
-              setReportMessage("");
+              if(!reportAttempt.current)setReportMessage("");
             }}><Flag size={16} />{t("Laporkan Masalah", "Report an issue")}</button></div></div> : <Profile english={Boolean(english)} onMessages={()=>{setSettings(false);setNoticeCategory("system");setNotice(true);}} />} {reportOpen && <Dialog title={t("Laporkan Masalah", "Report an issue")} onClose={() => setReportOpen(false)}><div className="flex items-center justify-between"><h3 id="report-title">{t("Laporkan Masalah", "Report an issue")}</h3><button className={roundControl} onClick={() => setReportOpen(false)} aria-label={t("Tutup", "Close")}><X size={18} /></button></div><form method="post" className={formLayout} onSubmit={async e => {
             e.preventDefault();
             const form = e.currentTarget;
-            const f = new FormData(form);
+            if(reportPending.current)return;
+            reportPending.current=true;setReportBusy(true);
+            const f = reportAttempt.current??new FormData(form);
+            if(!f.has("requestId"))f.set("requestId",crypto.randomUUID());
+            reportAttempt.current=f;
             try {
-              const r = await fetch("/api/report", {
-                method: "POST",
-                body: f
-              });
+              const r = await fetch("/api/report", {method:"POST",body:f});
               const data = await r.json();
-              setReportMessage(r.ok ? [t("Laporan berhasil dikirim.", "Report sent."),data.automaticResponse].filter(Boolean).join(" ") : data.error || t("Gagal mengirim laporan.", "Could not send report."));
-              if (r.ok) {
-                form.reset();
-                setReportPhoto(null);
-              }
+              setReportUncertain(r.status>=500||(r.status===429&&reportUncertain));
+              if(r.status<500&&(!reportUncertain||r.status!==429))reportAttempt.current=null;
+              setReportMessage(r.ok ? [t("Laporan berhasil dikirim.", "Report sent."),data.automaticResponse].filter(Boolean).join(" ") : data.error?.message || t("Gagal mengirim laporan.", "Could not send report."));
+              if (r.ok) {form.reset();setReportPhoto(null);}
             } catch {
-              setReportMessage(t("Gagal mengirim laporan.", "Could not send report."));
-            }
-          }}><label className={fieldLabel}>{t("Ceritakan masalahnya", "Describe the issue")}<textarea className={textAreaControl} name="message" minLength={10} maxLength={1000} required rows={6} /></label><label className={fieldLabel}>{t("Tautan terkait (opsional)", "Related link (optional)")}<input className={inputControl} name="url" type="url" maxLength={2048} /></label><label className={fieldLabel}>{t("Foto bukti (opsional, maks. 2 MB)", "Photo (optional, max 2 MB)")}<input className={inputControl} name="image" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setReportPhoto(e.target.files?.[0] || null)} /></label>{reportPreview && <img src={reportPreview} alt={t("Pratinjau bukti", "Evidence preview")} className="max-h-madevi-160 max-w-full rounded-madevi-12 object-contain" />}{reportMessage && <p role="status" className={statusMessage}>{reportMessage}</p>}<Button className="w-full">{t("Kirim laporan", "Send report")}</Button></form></Dialog>}</aside></div>}</>;
+              setReportUncertain(true);
+              setReportMessage(t("Hasil belum diketahui. Coba lagi untuk memeriksa laporan yang sama.", "The result is unknown. Try again to check the same report."));
+            } finally {reportPending.current=false;setReportBusy(false);}
+          }}><label className={fieldLabel}>{t("Ceritakan masalahnya", "Describe the issue")}<textarea className={textAreaControl} name="message" minLength={10} maxLength={1000} required disabled={reportUncertain||reportBusy} rows={6} /></label><label className={fieldLabel}>{t("Tautan terkait (opsional)", "Related link (optional)")}<input className={inputControl} name="url" type="url" disabled={reportUncertain||reportBusy} maxLength={2048} /></label><label className={fieldLabel}>{t("Foto bukti (opsional, maks. 2 MB)", "Photo (optional, max 2 MB)")}<input className={inputControl} name="image" type="file" disabled={reportUncertain||reportBusy} accept="image/jpeg,image/png,image/webp" onChange={e => setReportPhoto(e.target.files?.[0] || null)} /></label>{reportPreview && <img src={reportPreview} alt={t("Pratinjau bukti", "Evidence preview")} className="max-h-madevi-160 max-w-full rounded-madevi-12 object-contain" />}{reportMessage && <p role="status" className={statusMessage}>{reportMessage}</p>}<Button className="w-full" disabled={reportBusy}>{reportUncertain?t("Coba lagi laporan yang sama","Retry the same report"):t("Kirim laporan", "Send report")}</Button></form></Dialog>}</aside></div>}</>;
 }

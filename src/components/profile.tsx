@@ -170,7 +170,7 @@ export function Profile({
           })
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || t("Pendaftaran belum berhasil.", "Could not register."));
+        if (!response.ok) throw new Error(result.error?.message || t("Pendaftaran belum berhasil.", "Could not register."));
         let saved = false;
         if (photo) {
           try {
@@ -248,7 +248,7 @@ export function Profile({
       });
       const result = await response.json();
       if (!response.ok) {
-        setMessage(result.error || t("Gagal menyimpan.", "Could not save."));
+        setMessage(result.error?.message || t("Gagal menyimpan.", "Could not save."));
         return;
       }
       setComplete(true);

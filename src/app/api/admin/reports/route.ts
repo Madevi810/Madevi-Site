@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { z } from "zod";
 import { currentPrincipal } from "@/lib/access";
 import { bodyJson, failure, sameOrigin } from "@/lib/api";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 const headers = {"Cache-Control":"no-store"};
 const priorities = z.enum(["low","normal","high","urgent"]);
 
-export async function GET(request:Request) {
+async function handleGET(request:Request) {
   if(!await currentPrincipal("reports.read")) return failure("Tidak diizinkan",403);
   const parsed = parseAdminReportsQuery(request.url);
   if(!parsed.success) return failure("Parameter tidak valid",400);
@@ -33,7 +34,7 @@ export async function GET(request:Request) {
 const edit = z.object({id:z.number().int().positive(), status:z.enum(["new","in_progress","resolved","spam"]),
   priority:priorities.optional(), note:z.string().trim().max(1000).default("")}).strict();
 
-export async function PATCH(request:Request) {
+async function handlePATCH(request:Request) {
   const actor = await currentPrincipal("reports.read");
   if(!actor || !sameOrigin(request)) return failure("Tidak diizinkan",403);
   const input = edit.safeParse(await bodyJson(request).catch(()=>null));
@@ -50,3 +51,6 @@ export async function PATCH(request:Request) {
     return result.rowCount ? Response.json({ok:true}) : failure("Laporan tidak ditemukan",404);
   } catch { return failure("Status belum tersimpan",503); }
 }
+
+export const GET=apiRoute("/api/admin/reports", "GET", handleGET);
+export const PATCH=apiRoute("/api/admin/reports", "PATCH", handlePATCH);

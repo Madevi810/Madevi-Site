@@ -1,12 +1,14 @@
 # Memelihara Madevi setelah online
 
-Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplikasi, dan tempat aman untuk backup. Kerjakan latihan di staging sebelum produksi. Kode sudah memiliki probe, log terstruktur, dan [monitoring internal](operasi-admin.md#baca-monitoring). Siapkan penyedia monitoring, jadwal host, akses kunci, target terpisah, dan alarm setelah lingkungan tersedia.
+Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplikasi, dan tempat aman untuk backup. Kerjakan latihan di staging sebelum produksi. Kode sudah memiliki probe, log terstruktur, dan [monitoring internal](operasi-admin.md#baca-monitoring). Siapkan timer host, akses kunci dan target terpisah setelah lingkungan tersedia. Kanal alarm SMTP dapat dijalankan di host yang sama. Pemantauan dari luar host bersifat opsional agar gangguan mesin host tetap dapat terdeteksi.
 
 ## Pemeriksaan rutin
 
-- Gunakan layanan monitoring untuk mengecek `/api/health/live` (proses menjawab) dan `/api/health/ready` (koneksi database dan migrasi tersedia). Tentukan interval, batas kegagalan berturut-turut, penerima alarm, dan petugas yang merespons. Uji alarm dan pulihnya secara terkendali pada staging.
-- Pantau penggunaan penyimpanan PostgreSQL, durasi query, HTTP 5xx, kegagalan autentikasi, email tertolak, dan batas biaya. Pilih retensi log serta akses. Catat waktu kejadian dan commit. Hindari merekam URI database, password, token, isi email atau data pribadi. [Contoh monitoring](../ops/monitoring.example.yaml), [tata kelola data](../ops/data-governance.md)
+- Probe dan alarm host mengecek `/api/health/live` (proses menjawab) dan `/api/health/ready` (koneksi database dan migrasi tersedia). Tentukan interval, batas kegagalan berturut-turut, penerima alarm, dan petugas yang merespons. Uji alarm dan pulihnya secara terkendali pada staging.
+- Pantau penggunaan penyimpanan PostgreSQL, durasi query, HTTP 5xx, kegagalan autentikasi, email tertolak, dan batas biaya. Pilih retensi log serta akses. Catat waktu kejadian dan commit. Hindari merekam URI database, password, token, isi email atau data pribadi. [Penjadwalan dan alarm](../ops/systemd/README.md), [tata kelola data](../ops/data-governance.md)
 - Jika readiness 503 dan liveness 200, periksa koneksi database, CA, akses jaringan, kuota dan status migrasi, indeks admin dan kolom bukti MFA. Jika keduanya gagal, periksa proses, port, HTTPS/proxy dan versi image. Kegagalan SMTP atau Google harus diuji dari alur pengguna karena probe tidak memeriksanya. [Respons insiden](../ops/incident-response.md)
+
+- Jalankan `npm run ops:ready` dari checkout dengan environment operasi. Bandingkan hasil dengan waktu laporan worker di panel dan daftar timer systemd. Saat pengukuran tertunda, periksa journal per unit. Simpan `X-Request-Id` dari respons API atau ID pekerjaan pada riwayat admin bersama waktu kejadian. Keluaran log berisi kode kegagalan, route tetap, metode dan ID. [Kontrak API](api.md)
 
 ## Backup dan latihan pemulihan
 

@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { z } from "zod";
 import { currentPrincipal } from "@/lib/access";
 import { pool } from "@/lib/db";
@@ -7,7 +8,7 @@ import { parseAdminUsersQuery } from "@/lib/admin-users-query";
 
 const bad=(error:string,status:number)=>Response.json({error},{status,headers:{"Cache-Control":"no-store"}});
 export const dynamic="force-dynamic";
-export async function GET(request:Request) {
+async function handleGET(request:Request) {
   if (!await currentPrincipal("accounts.manage")) return bad("Tidak diizinkan",403);
   const url=new URL(request.url);
   const id=url.searchParams.get("id");
@@ -40,7 +41,7 @@ const actionInput=z.object({
   id:z.string().min(1).max(128),action:z.enum(["block","restore","suspend","ban","revoke"]),
   reason:z.string().trim().min(3).max(500),until:z.iso.datetime({offset:true}).optional()
 }).strict().refine(v=>v.action==="suspend" ? Boolean(v.until && Date.parse(v.until)>Date.now()) : !v.until);
-export async function POST(request:Request) {
+async function handlePOST(request:Request) {
   const admin=await currentPrincipal("accounts.manage");
   if(!admin || !sameOrigin(request)) return bad("Tidak diizinkan",403);
   const parsed=actionInput.safeParse(await bodyJson(request).catch(()=>null));
@@ -67,3 +68,6 @@ export async function POST(request:Request) {
     return bad("Perubahan akun belum tersimpan",503);
   } finally {client?.release();}
 }
+
+export const GET=apiRoute("/api/admin/users", "GET", handleGET);
+export const POST=apiRoute("/api/admin/users", "POST", handlePOST);

@@ -12,7 +12,7 @@ type Actor = { id:string; role:string };
 type Query = z.infer<typeof queryInput>;
 type Item = { id:string; author_id:string; workflow_status:string; latest_revision:number };
 export class ContentError extends Error { constructor(public status:number, message:string){super(message)} }
-async function tx<T>(fn:(client:PoolClient)=>Promise<T>):Promise<T>{const client=await pool.connect();try{await client.query("BEGIN");const result=await fn(client);await client.query("COMMIT");return result}catch(error){await client.query("ROLLBACK");throw error}finally{client.release()}}
+async function tx<T>(fn:(client:PoolClient)=>Promise<T>):Promise<T>{const client=await pool.connect();try{await client.query("BEGIN");const result=await fn(client);await client.query("COMMIT");return result}catch(error){await client.query("ROLLBACK").catch(()=>{});throw error}finally{client.release()}}
 async function lock(client:PoolClient,id:string):Promise<Item>{const r=await client.query("SELECT id,author_id,workflow_status,latest_revision FROM madevi_content WHERE id=$1 AND deleted_at IS NULL FOR UPDATE",[id]);if(!r.rowCount)throw new ContentError(404,"Konten tidak ditemukan");return r.rows[0]}
 function checkRevision(item:Item, revision:number){if(item.latest_revision!==revision)throw new ContentError(409,"Data berubah; muat ulang sebelum menyimpan")}
 async function audit(client:PoolClient,actor:Actor,action:string,id:string){await client.query("INSERT INTO madevi_audit (actor_id,action,target_id) VALUES ($1,$2,$3)",[actor.id,action,id])}

@@ -18,8 +18,9 @@ export const adminAction=z.discriminatedUnion("action",[
 ]);
 export const listInput=z.object({
   id:z.uuid().optional(),page:z.coerce.number().int().min(1).max(10000).default(1),
+  before:z.string().regex(/^[1-9][0-9]{0,17}$/).optional(),
   status:z.enum(["waiting_admin","waiting_user","resolved"]).optional()
-}).strict();
+}).strict().refine(q=>!q.before||Boolean(q.id&&q.page===1));
 export type ThreadQuery=z.infer<typeof listInput>;
 type ThreadAction=z.infer<typeof userAction>|z.infer<typeof adminAction>;
 
@@ -39,9 +40,12 @@ export async function readThreads(query:ThreadQuery,userId?:string) {
   const record=(await pool.query(`SELECT id,title,status,version,updated_at FROM madevi_support_threads
     WHERE id=$1 AND ($2::text IS NULL OR user_id=$2)`,[query.id,userId??null])).rows[0];
   if(!record)throw new SupportError("Percakapan tidak ditemukan.",404);
-  const result=await pool.query(`SELECT id,sender,body,created_at FROM madevi_support_posts
-    WHERE thread_id=$1 AND ($2::boolean OR sender<>'note') ORDER BY created_at DESC,id DESC LIMIT 26 OFFSET $3`,[query.id,!userId,offset]);
-  return {thread:record,posts:result.rows.slice(0,25).reverse(),next:result.rows.length>25};
+  const result=await pool.query(`SELECT id,sender,body,created_at,event_order::text AS position FROM madevi_support_posts
+    WHERE thread_id=$1 AND ($2::boolean OR sender<>'note') AND ($3::bigint IS NULL OR event_order<$3)
+    ORDER BY event_order DESC LIMIT 26 OFFSET $4`,[query.id,!userId,query.before??null,offset]);
+  const next=result.rows.length>25;
+  const before=next?result.rows[24].position:null;
+  return {thread:record,posts:result.rows.slice(0,25).reverse().map(({position:_position,...post})=>post),next,before};
 }
 
 export async function updateThread(actor:string,input:ThreadAction,isAdmin=false) {
@@ -50,9 +54,12 @@ export async function updateThread(actor:string,input:ThreadAction,isAdmin=false
     await client.query("BEGIN");
     if(input.action==="create") {
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))",["support:"+actor]);
-      const existing=(await client.query("SELECT user_id FROM madevi_support_threads WHERE id=$1",[input.id])).rows[0];
+      const existing=(await client.query(`SELECT t.user_id,t.title,
+        (SELECT p.body FROM madevi_support_posts p WHERE p.thread_id=t.id AND p.sender='user' ORDER BY p.event_order LIMIT 1) AS body
+        FROM madevi_support_threads t WHERE t.id=$1`,[input.id])).rows[0];
       if(existing) {
         if(existing.user_id!==actor)throw new SupportError("Percakapan tidak ditemukan.",404);
+        if(existing.title!==input.title||existing.body!==input.body)throw new SupportError("ID permintaan sudah digunakan untuk isi berbeda.");
         await client.query("COMMIT");return;
       }
       const count=(await client.query("SELECT count(*)::int AS n FROM madevi_support_threads WHERE user_id=$1 AND status<>'resolved'",[actor])).rows[0].n;
@@ -70,9 +77,11 @@ export async function updateThread(actor:string,input:ThreadAction,isAdmin=false
       const record=(await client.query(`SELECT status,version FROM madevi_support_threads
         WHERE id=$1 AND ($2::text IS NULL OR user_id=$2) FOR UPDATE`,[input.id,isAdmin?null:actor])).rows[0];
       if(!record)throw new SupportError("Percakapan tidak ditemukan.",404);
-      const existing=(await client.query("SELECT thread_id,actor_id FROM madevi_support_posts WHERE id=$1",[input.postId])).rows[0];
+      const sender=input.action==="note"?"note":input.action==="reply"?isAdmin?"admin":"user":"event";
+      const text="body" in input?input.body:input.action==="resolve"?"Admin menyelesaikan percakapan.":"Admin membuka kembali percakapan.";
+      const existing=(await client.query("SELECT thread_id,actor_id,sender,body FROM madevi_support_posts WHERE id=$1",[input.postId])).rows[0];
       if(existing) {
-        if(existing.thread_id!==input.id||existing.actor_id!==actor)throw new SupportError("ID perubahan sudah digunakan.");
+        if(existing.thread_id!==input.id||existing.actor_id!==actor||existing.sender!==sender||existing.body!==text)throw new SupportError("ID perubahan sudah digunakan.");
         await client.query("COMMIT");return;
       }
       if(record.version!==input.version)throw new SupportError("Percakapan berubah. Muat ulang sebelum meneruskan.");
@@ -82,8 +91,6 @@ export async function updateThread(actor:string,input:ThreadAction,isAdmin=false
       const used=(await client.query("SELECT count(*)::int AS n FROM madevi_support_posts WHERE thread_id=$1",[input.id])).rows[0].n;
       if(used>=500&&(input.action==="reply"||input.action==="note"))throw new SupportError("Percakapan mencapai batas 500 pesan. Tutup dan buat percakapan baru.");
       const status=input.action==="resolve"?"resolved":input.action==="reopen"||!isAdmin?"waiting_admin":input.action==="reply"?"waiting_user":record.status;
-      const sender=input.action==="note"?"note":input.action==="reply"?isAdmin?"admin":"user":"event";
-      const text="body" in input?input.body:input.action==="resolve"?"Admin menyelesaikan percakapan.":"Admin membuka kembali percakapan.";
       await client.query("INSERT INTO madevi_support_posts(id,thread_id,sender,actor_id,body) VALUES($1,$2,$3,$4,$5)",[input.postId,input.id,sender,actor,text]);
       await client.query("UPDATE madevi_support_threads SET status=$2,version=version+1,updated_at=now() WHERE id=$1",[input.id,status]);
       if(isAdmin)await client.query("INSERT INTO madevi_audit(actor_id,action,target_id) VALUES($1,$2,$3)",[actor,`support.${input.action}`,input.id]);

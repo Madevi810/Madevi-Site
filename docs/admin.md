@@ -43,6 +43,8 @@ Pada **Laporan & Dukungan**, lihat bukti privat hanya ketika diperlukan. Tetapka
 4. Gunakan **Coba lagi** bila status gagal. Ada maksimal lima percobaan per pekerjaan dan hingga 100 pekerjaan terjadwal pada satu waktu. Hasil disimpan per penerima dan satu pekerjaan hanya dapat menghasilkan satu notifikasi per akun. Penerima membuka pesan dari profil melalui **Pesan** atau dari tab **Sistem** pada notifikasi. Angka dibaca bertambah setelah penerima membuka pesan. Pengumuman umum memiliki jalur terpisah bagi pengunjung anonim dan berisi teks.
 5. SMTP melayani verifikasi akun dan OTP. Pengiriman kampanye email masih di luar kemampuan panel. Riwayat pengiriman ini mengukur notifikasi website.
 
+Jika browser kehilangan respons, pilih **Periksa dengan coba kembali**. Server menggunakan ID dan isi asli dan membaca hasil pekerjaan yang sudah ada. Periksa waktu laporan worker. Pekerjaan terjadwal menunggu sampai worker dapat berjalan.
+
 ## Gunakan lampiran dan percakapan dukungan
 
 Untuk unggahan TXT dan CSV, pilih UTF-8. CSV memakai koma, jumlah kolom konsisten, dan sel tanpa formula. PDF diperiksa tanda struktur berkas. PDF, TXT dan CSV dikirim sebagai unduhan, dengan nama yang dinormalkan. JPG, PNG dan WebP dikonversi menjadi WebP. Untuk publikasi konten, pilih visibilitas publik saat revisi terbit. Lampiran pesan privat hanya dapat diakses admin dan penerima yang benar-benar mendapat pesan. Lampiran yang masih dirujuk revisi atau riwayat pesan tetap terlindungi. Untuk mengganti lampiran aktif pada konten, simpan revisi baru.
@@ -54,3 +56,6 @@ Pengguna masuk lalu membuka **Percakapan dukungan**. FAQ kata kunci aktif didahu
 Untuk pekerjaan host, unduhan cadangan, rollback, versi pengaturan, dan monitoring, ikuti [panduan operasi admin](operasi-admin.md).
 
 Jika data gagal dimuat, periksa sesi dan `npm run check:ready`. Periksa `/api/health/live` dan `/api/health/ready` dari lingkungan tujuan. Kehilangan akses admin ditangani melalui kode pemulihan atau [prosedur penyerahan](penyerahan.md). Untuk gangguan database atau pergantian rilis, ikuti [prosedur pemulihan](../ops/backup-restore.md).
+
+
+Atur **Ketersediaan admin** pada menu Asisten & Respons Otomatis. Pilih mode manual atau jadwal, tentukan zona waktu seperti `Asia/Jakarta`, lalu gunakan tombol **Tambah rentang** untuk hari dan jam. Gunakan **Akhir hari** untuk pukul 24.00. Jadwal lintas tengah malam memakai dua rentang. Balasan otomatis hanya dapat ditempel pada pembuka percakapan sesuai aturan dan mode yang disimpan. Buka riwayat dengan halaman pesan lama; pembuka dan jawaban otomatis ditampilkan sesuai urutan. Catatan internal tetap dibatasi pada pengelola.

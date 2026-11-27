@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AdminHeading, AdminLoading, AdminPageNav, adminJson, adminRequest, localDate, splitLines, useAdminData, value, values } from "./admin-data";
+import { useRef, useState } from "react";
+import { AdminRequestError, AdminHeading, AdminLoading, AdminPageNav, adminJson, adminRequest, localDate, splitLines, useAdminData, value, values } from "./admin-data";
 import { adminPanel, fieldLabel, inputControl, primaryButton, statusMessage, textAreaControl, textButton } from "./styles";
 
 type Site={version:number;announcement:string;navigation:{label:string;href:string}[]};
@@ -80,6 +80,8 @@ export function AdminSite({mode}:{mode:"pages"|"settings"}) {
 type ImageRecord={id:string;name:string;mime_type:string;visibility:string;bytes:number;linked:boolean};
 export function AdminMedia() {
   const [page,setPage]=useState(1),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
+  const [retry,setRetry]=useState(false);
+  const attempt=useRef<FormData|null>(null), uploading=useRef(false);
   const list=useAdminData<{items:ImageRecord[];next:boolean}>(`/api/admin/media?page=${page}`);
   async function remove(item:ImageRecord) {
     if(!window.confirm(`Hapus berkas ${item.name}?`))return;
@@ -90,21 +92,33 @@ export function AdminMedia() {
   return <><AdminHeading description="JPEG, PNG, WebP, PDF, TXT, atau CSV. Maksimal 2 MB per file, total pustaka 256 MB.">Media & Berkas</AdminHeading>
   <section className={adminPanel}><h2>Unggah berkas</h2>
     <form className="grid gap-3" onSubmit={async e=>{
-      e.preventDefault();const form=e.currentTarget;setBusy(true);setMessage("");
-      try {const result=await adminRequest<{id:string}>("/api/admin/media",{method:"POST",body:values(form)});form.reset();setPage(1);list.reload();setMessage(`Berkas tersimpan. ID ${result.id}`);}
-      catch(error){setMessage((error as Error).message);}finally{setBusy(false);}
+      e.preventDefault();if(uploading.current||busy)return;
+      const form=e.currentTarget;
+      if(!attempt.current) {
+        attempt.current=values(form);
+        attempt.current.set("id",crypto.randomUUID());
+      }
+      uploading.current=true;setBusy(true);setMessage("");
+      try {
+        const result=await adminRequest<{id:string}>("/api/admin/media",{method:"POST",body:attempt.current});
+        attempt.current=null;setRetry(false);form.reset();setPage(1);list.reload();setMessage(`Berkas tersimpan. ID ${result.id}`);
+      } catch(error) {
+        const uncertain=error instanceof AdminRequestError&&(error.uncertain||retry&&error.status===429);
+        if(!uncertain)attempt.current=null;
+        setRetry(uncertain);setMessage((error as Error).message);
+      } finally {uploading.current=false;setBusy(false);}
     }}>
-      <label className={fieldLabel}>Nama<input className={inputControl} name="name" required maxLength={120}/></label>
-      <label className={fieldLabel}>Visibilitas<select className={inputControl} name="visibility"><option value="private">Privat, untuk admin atau penerima pesan</option><option value="public">Publik saat revisi terkait diterbitkan</option></select></label>
-      <label className={fieldLabel}>Berkas<input className={inputControl} name="file" type="file" accept="image/jpeg,image/png,image/webp,.pdf,.txt,.csv" required/></label>
-      <button className={primaryButton} disabled={busy}>Unggah berkas</button>
+      <label className={fieldLabel}>Nama<input className={inputControl} name="name" disabled={busy||retry} required maxLength={120}/></label>
+      <label className={fieldLabel}>Visibilitas<select className={inputControl} name="visibility" disabled={busy||retry}><option value="private">Privat, untuk admin atau penerima pesan</option><option value="public">Publik saat revisi terkait diterbitkan</option></select></label>
+      <label className={fieldLabel}>Berkas<input className={inputControl} name="file" disabled={busy||retry} type="file" accept="image/jpeg,image/png,image/webp,.pdf,.txt,.csv" required/></label>
+      <button className={primaryButton} disabled={busy}>{retry?"Periksa dengan coba kembali":"Unggah berkas"}</button>
     </form>{message&&<p role="status" className={statusMessage}>{message}</p>}
   </section>
   {!list.data?<AdminLoading error={list.error}/>:<section className={adminPanel}><h2>Pustaka berkas</h2>
     {list.data.items.length?list.data.items.map(item=><div key={item.id} className="border-b border-madevi-line py-3">
       <a href={`/api/media/${item.id}`}>{item.name}</a><p>{item.visibility==="public"?"Publik saat ditautkan":"Privat"} · {item.mime_type} · {item.bytes} byte · {item.linked?"Dipakai pada revisi atau pesan":"Belum dipakai"}</p>
       <label className={fieldLabel}>ID lampiran<input className={inputControl} readOnly value={item.id} onFocus={e=>e.currentTarget.select()}/></label>
-      {!item.linked&&<button className={textButton} disabled={busy} onClick={()=>void remove(item)}>Hapus berkas</button>}
+      {!item.linked&&<button className={textButton} disabled={busy||retry} onClick={()=>void remove(item)}>Hapus berkas</button>}
     </div>):<p>Belum ada berkas di halaman ini.</p>}
     <AdminPageNav page={page} next={list.data.next} move={setPage}/>
   </section>}</>;

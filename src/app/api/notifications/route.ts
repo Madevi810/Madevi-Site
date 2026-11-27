@@ -1,3 +1,4 @@
+import { apiRoute } from "@/lib/api-response";
 import { NextResponse } from "next/server";
 import { currentAccount } from "@/lib/access";
 import { bodyJson, sameOrigin } from "@/lib/api";
@@ -5,7 +6,7 @@ import { pool } from "@/lib/db";
 import { encodeNotificationCursor, parseNotificationQuery } from "@/lib/notification-query";
 import { z } from "zod";
 export const dynamic="force-dynamic";
-export async function GET(request:Request){
+async function handleGET(request:Request){
   const parsed=parseNotificationQuery(request.url);
   if(!parsed.success)return NextResponse.json({error:"Parameter notifikasi tidak valid."},{status:400,headers:{"Cache-Control":"no-store"}});
   try{
@@ -24,7 +25,7 @@ export async function GET(request:Request){
     return NextResponse.json({notifications:items.map(({cursor_time,...notice})=>notice),signedIn:Boolean(account),nextCursor},{headers:{"Cache-Control":"private, no-store"}});
   }catch{return NextResponse.json({error:"Notifikasi belum tersedia."},{status:503,headers:{"Cache-Control":"no-store"}})}
 }
-export async function POST(request:Request){
+async function handlePOST(request:Request){
   if(!sameOrigin(request))return NextResponse.json({error:"Permintaan tidak valid."},{status:403});
   const account=await currentAccount();if(!account)return NextResponse.json({error:"Masuk untuk menandai notifikasi."},{status:401});
   const parsed=z.object({id:z.uuid()}).strict().safeParse(await bodyJson(request).catch(()=>null));
@@ -32,3 +33,6 @@ export async function POST(request:Request){
   try{const r=await pool.query(`INSERT INTO madevi_notification_reads(notification_id,user_id) SELECT id,$2 FROM madevi_notifications WHERE id=$1 AND (category='general' OR recipient_id=$2) ON CONFLICT DO NOTHING RETURNING notification_id`,[parsed.data.id,account.row.id]);return NextResponse.json({ok:true,updated:Boolean(r.rowCount)},{headers:{"Cache-Control":"no-store"}})}
   catch{return NextResponse.json({error:"Status notifikasi belum tersimpan."},{status:503,headers:{"Cache-Control":"no-store"}})}
 }
+
+export const GET=apiRoute("/api/notifications", "GET", handleGET);
+export const POST=apiRoute("/api/notifications", "POST", handlePOST);

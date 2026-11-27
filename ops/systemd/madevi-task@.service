@@ -1,0 +1,17 @@
+# Copy and adjust the host paths and account before enabling any timer.
+[Unit]
+Description=Madevi host task (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=madevi-ops
+Group=madevi-ops
+WorkingDirectory=/srv/madevi
+EnvironmentFile=/etc/madevi/operations.env
+ExecStart=/usr/bin/node /srv/madevi/scripts/scheduled-operation.mjs %i
+UMask=0077
+TimeoutStartSec=20min
+NoNewPrivileges=true
+PrivateTmp=true

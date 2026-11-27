@@ -47,4 +47,8 @@ jobs:
           PG_CONTAINER: ${{ job.services.postgres.id }}
           MADEVI_TEST_DATABASE_URL: postgresql://madevi_test:local-test-only@127.0.0.1:25435/madevi_ci_test
         run: bash scripts/test-encrypted-backup.sh
+      - name: Verify isolated Docker rollback
+        run: |
+          docker pull caddy:2.10-alpine
+          node scripts/test-docker-rollback.mjs
       - run: npm audit --omit=dev --audit-level=high
