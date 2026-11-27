@@ -1,6 +1,6 @@
 # Memelihara Madevi setelah online
 
-Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplikasi, dan tempat aman untuk backup. Kerjakan latihan di staging sebelum produksi. Kode sudah memiliki probe dan log terstruktur. Siapkan penyedia monitoring, jadwal host, akses kunci, target terpisah, dan alarm setelah lingkungan tersedia.
+Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplikasi, dan tempat aman untuk backup. Kerjakan latihan di staging sebelum produksi. Kode sudah memiliki probe, log terstruktur, dan [monitoring internal](operasi-admin.md#baca-monitoring). Siapkan penyedia monitoring, jadwal host, akses kunci, target terpisah, dan alarm setelah lingkungan tersedia.
 
 ## Pemeriksaan rutin
 
@@ -17,6 +17,6 @@ Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplika
 
 ## Rollback dan pindah penyedia
 
-Sebelum rilis, simpan identitas image/commit, salinan env privat, backup yang teruji, dan daftar perubahan skema. Jika aplikasi baru gagal, hentikan pengalihan traffic lalu jalankan image sebelumnya selama skema masih kompatibel. Bila ada perubahan data/skema yang tidak kompatibel, siapkan perbaikan maju atau latihan restore ke target terpisah. Perintah rollback uji di repo hanya berlaku pada database development kosong.
+Sebelum rilis, catat image lokal di katalog host, simpan salinan env privat, uji backup dan periksa daftar migrasi. [Rollback melalui panel](operasi-admin.md#pulihkan-pengaturan-dan-rilis) Jika aplikasi baru gagal, hentikan pengalihan traffic lalu jalankan image sebelumnya selama skema masih kompatibel. Bila ada perubahan data/skema yang tidak kompatibel, siapkan perbaikan maju atau latihan restore ke target terpisah. Perintah rollback uji di repo hanya berlaku pada database development kosong.
 
 Untuk pindah hosting, buat lingkungan staging di tujuan, siapkan image dan akses DB, lalu uji semua jalur yang dipakai. Jika DB ikut pindah, rencanakan jeda penulisan, dump terakhir dan perpindahan data. Jika domain berganti, siapkan TLS/OAuth dan catat record lama. Alihkan traffic hanya setelah pemeriksaan lulus. Pertahankan akses ke sumber hingga berhasil memulihkan data dan membuktikan transisi. [Peta dan contoh perpindahan](ganti-layanan.md), [prosedur rilis](../ops/operations.md)

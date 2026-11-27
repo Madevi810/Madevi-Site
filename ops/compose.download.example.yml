@@ -1,0 +1,8 @@
+# Salin di root sebagai compose.download.yml saat menyiapkan host.
+# Host dan proses web memakai UID yang mempunyai izin baca arsip privat.
+services:
+  madevi:
+    volumes:
+      - /srv/madevi/backups:/var/lib/madevi/board-backups:ro
+    environment:
+      MADEVI_BACKUP_DOWNLOAD_DIR: /var/lib/madevi/board-backups

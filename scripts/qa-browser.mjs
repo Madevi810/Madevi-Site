@@ -146,3 +146,109 @@ export async function verifyRegistrationPhoto({ browser, origin, env, mail, imag
     console.log("Lulus: foto pendaftaran dengan CSP aktif; data sementara sukses maupun rusak dibersihkan.");
   } finally { await context.close(); }
 }
+
+export async function verifyAdminWorkflowUI({browser,origin,adminCookie,userCookie}) {
+  const owner=await browser.newContext({viewport:{width:390,height:844}});
+  const member=await browser.newContext({viewport:{width:1440,height:900}});
+  function cookies(value) {
+    return value.split("; ").filter(part=>part.includes("=")).map(token=>{
+      const [name,...rest]=token.split("=");return {name,value:rest.join("="),url:origin};
+    });
+  }
+  await owner.addCookies(cookies(adminCookie));await member.addCookies(cookies(userCookie));
+  const page=await owner.newPage(),user=await member.newPage();
+  async function panel(value) {await page.goto(`${origin}/admin?panel=${value}`);}
+  try {
+    await panel("media");
+    await page.getByLabel("Nama",{exact:true}).fill("Panduan browser");
+    await page.locator('input[type="file"]').setInputFiles({name:"catatan.txt",mimeType:"text/plain",buffer:Buffer.from("Dokumen UTF-8 dari browser.")});
+    const uploaded=page.waitForResponse(res=>res.url().endsWith("/api/admin/media")&&res.request().method()==="POST");
+    await page.getByRole("button",{name:"Unggah berkas",exact:true}).click();
+    const result=await uploaded;
+    assert.equal(result.status(),201);
+    const file=(await result.json()).id;
+    await page.getByRole("link",{name:"Panduan browser",exact:true}).waitFor();
+
+    await panel("notifications");
+    async function draft(title) {
+      await page.getByLabel("Tujuan pesan",{exact:true}).selectOption("all");
+      await page.getByLabel("Judul pesan",{exact:true}).fill(title);
+      await page.getByLabel("Isi pesan",{exact:true}).fill("Pesan pengujian browser.");
+      await page.getByLabel("ID lampiran dari pustaka, opsional").fill(file);
+      await page.getByRole("button",{name:"Simpan draf pesan"}).click();
+      const row=page.locator("article").filter({has:page.getByRole("heading",{name:title,exact:true})});
+      await row.getByRole("button",{name:"Kirim sekarang",exact:true}).waitFor();
+      return row;
+    }
+    const direct=await draft("Kirim browser sekarang");
+    await direct.getByRole("button",{name:"Kirim sekarang",exact:true}).click();
+    await direct.getByText(/\d+ penerima saat ini/).waitFor();
+    await direct.getByRole("link",{name:"Panduan browser",exact:true}).waitFor();
+    await direct.getByRole("checkbox",{name:"Konfirmasi penerima, isi dan waktu"}).check();
+    await direct.getByRole("button",{name:"Konfirmasi kirim sekarang"}).click();
+    await direct.getByText(/^Terkirim ·/).waitFor();
+    const later=await draft("Jadwal browser");
+    await later.getByRole("button",{name:"Jadwalkan",exact:true}).click();
+    const localTime=await page.evaluate(()=>{
+      const future=new Date(Date.now()+3600000);
+      return new Date(future.getTime()-future.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    });
+    await later.getByLabel("Waktu pengiriman setempat").fill(localTime);
+    await later.getByRole("checkbox",{name:"Konfirmasi penerima, isi dan waktu"}).check();
+    await later.getByRole("button",{name:"Konfirmasi jadwal"}).click();
+    await later.getByText(/^Menunggu eksekusi ·/).waitFor();
+    page.once("dialog",dialog=>dialog.accept());
+    await later.getByRole("button",{name:"Batalkan pesan"}).click();
+    await later.getByText(/^Dibatalkan ·/).waitFor();
+
+    await panel("settings");
+    const before=(await (await page.request.get(origin+"/api/admin/site")).json()).settings;
+    await page.getByLabel(/Teks pengumuman/).fill("Pengumuman browser");
+    await page.getByRole("button",{name:"Simpan pengaturan"}).click();
+    await page.getByText("Perubahan tersimpan.").waitFor();
+    await page.getByText("Riwayat versi dan pemulihan",{exact:true}).click();
+    await page.getByRole("button",{name:`Bandingkan versi ${before.version}`,exact:true}).click();
+    await page.getByRole("region",{name:"Perbandingan versi"}).getByText("Pengumuman browser",{exact:true}).waitFor();
+    await page.getByRole("checkbox",{name:"Simpan snapshot lama sebagai versi baru"}).check();
+    await page.getByRole("button",{name:"Pulihkan pengaturan"}).click();
+    await page.getByText("Snapshot disimpan sebagai versi baru.").waitFor();
+
+    await panel("rules");
+    await page.getByLabel("Mode ketersediaan",{exact:true}).selectOption("unavailable");
+    await page.getByLabel("Jawaban saat admin tidak tersedia").fill("Admin sedang di luar jadwal pengujian.");
+    await page.getByRole("button",{name:"Simpan ketersediaan"}).click();
+    await page.getByText("Ketersediaan tersimpan.").waitFor();
+    await user.goto(origin+"/dukungan");
+    await user.getByLabel("Topik",{exact:true}).fill("Percakapan browser");
+    await user.getByLabel("Pertanyaan",{exact:true}).fill("Mohon penjelasan untuk pengujian.");
+    await user.getByRole("button",{name:"Buat percakapan"}).click();
+    await user.getByText("Admin sedang di luar jadwal pengujian.").waitFor();
+    await page.getByRole("button",{name:"Muat ulang percakapan"}).click();
+    await page.getByRole("button",{name:"Percakapan browser",exact:true}).click();
+    await page.getByLabel("Catatan internal",{exact:true}).fill("Catatan browser yang rahasia.");
+    await page.getByRole("button",{name:"Simpan catatan internal"}).click();
+    await page.getByText("Catatan browser yang rahasia.",{exact:true}).waitFor();
+    await page.getByLabel("Balasan",{exact:true}).fill("Balasan browser kepada pengguna.");
+    await page.getByRole("button",{name:"Kirim balasan"}).click();
+    await page.getByText("Balasan browser kepada pengguna.",{exact:true}).waitFor();
+    await user.getByRole("button",{name:"Muat ulang percakapan"}).click();
+    await user.getByText("Balasan browser kepada pengguna.",{exact:true}).waitFor();
+    assert.equal(await user.getByText("Catatan browser yang rahasia.",{exact:true}).count(),0);
+    await user.getByLabel("Balasan",{exact:true}).fill("Tindak lanjut melalui browser.");
+    await user.getByRole("button",{name:"Kirim balasan"}).click();
+    await user.getByText("Tindak lanjut melalui browser.",{exact:true}).waitFor();
+    await page.getByRole("button",{name:"Muat ulang percakapan"}).click();
+    await page.getByText("Tindak lanjut melalui browser.",{exact:true}).waitFor();
+    page.once("dialog",dialog=>dialog.accept());
+    await page.getByRole("button",{name:"Selesaikan percakapan"}).click();
+    await page.getByRole("button",{name:"Buka kembali",exact:true}).waitFor();
+
+    await page.route("**/api/admin/monitoring",route=>route.fulfill({status:503,json:{error:{message:"Monitoring gagal pada pengujian."}}}));
+    await panel("statistics");
+    await page.getByText("Monitoring gagal pada pengujian.").waitFor();
+    await page.unroute("**/api/admin/monitoring");
+    await page.getByRole("button",{name:"Muat ulang pengukuran"}).click();
+    await page.getByText("Sumbernya respons akhir handler Madevi",{exact:false}).waitFor();
+    console.log("UI Chromium lulus: lampiran, kirim langsung, jadwal/batal, riwayat pengaturan, dukungan dua arah dan pemulihan monitoring.");
+  } finally{await owner.close();await member.close();}
+}

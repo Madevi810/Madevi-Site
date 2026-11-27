@@ -1,7 +1,8 @@
+import { observeRoute } from "@/lib/monitoring";
 import { z } from "zod";
 import { currentAdmin } from "@/lib/access";
 import { failure, bodyJson, sameOrigin } from "@/lib/api";
-import { dispatchMessages } from "@/lib/message-dispatch";
+import { dispatchMessages, messageAudience } from "@/lib/message-dispatch";
 import { pool } from "@/lib/db";
 import { accountRestricted } from "@/lib/account-status";
 
@@ -14,12 +15,23 @@ const save = z.discriminatedUnion("action",[
   z.object({action:z.literal("draft"),id:z.uuid(), title:pattern(160), body:pattern(2000), audience, recipientId:z.string().min(1).max(128).optional(), mediaId:z.uuid().optional(), expectedUpdated:z.iso.datetime({offset:true}).optional()}).strict(),
   z.object({action:z.literal("template"),id:z.uuid(), name:z.string().trim().min(1).max(100), title:pattern(160), body:pattern(2000)}).strict(),
   z.object({action:z.literal("removeTemplate"),id:z.uuid()}).strict(),
-  z.object({action:z.enum(["queue","send","cancel","retry"]),id:z.uuid(),runAt:z.iso.datetime({offset:true}).optional()}).strict()
+  z.object({action:z.enum(["queue","send","cancel","retry"]),id:z.uuid(),runAt:z.iso.datetime({offset:true}).optional(),expectedUpdated:z.iso.datetime({offset:true}).optional()}).strict()
 ]);
 const headers={"Cache-Control":"no-store"};
 
 export async function GET(request:Request) {
   if(!await currentAdmin()) return failure("Tidak diizinkan",403);
+  const preview=new URL(request.url).searchParams.get("preview");
+  if(preview!==null) {
+    if(!z.uuid().safeParse(preview).success)return failure("ID pesan tidak valid.",400);
+    try {
+      const {rows}=await pool.query(`SELECT j.id,j.title,j.body,j.status,j.audience,j.recipient_id,
+        j.media_id,m.name AS media_name,date_trunc('milliseconds',j.updated_at) AS updated_at,
+        (SELECT count(*)::int FROM "user" u WHERE ${messageAudience}) AS recipients
+        FROM madevi_message_jobs j LEFT JOIN madevi_library m ON m.id=j.media_id WHERE j.id=$1`,[preview]);
+      return rows[0]?Response.json(rows[0],{headers}):failure("Pesan tidak ditemukan.",404);
+    } catch {return failure("Cakupan pengiriman belum dapat dihitung.",503);}
+  }
   const parsed=z.coerce.number().int().min(1).max(10000).safeParse(new URL(request.url).searchParams.get("page")??1);
   if(!parsed.success) return failure("Halaman tidak valid",400);
   try {
@@ -34,7 +46,7 @@ export async function GET(request:Request) {
   } catch { return failure("Pesan belum tersedia",503); }
 }
 
-export async function POST(request:Request) {
+async function handlePOST(request:Request) {
   const actor=await currentAdmin();
   if(!actor || !sameOrigin(request)) return failure("Tidak diizinkan",403);
   const parsed=save.safeParse(await bodyJson(request).catch(()=>null));
@@ -66,8 +78,8 @@ export async function POST(request:Request) {
     } else {
       const target=data.action==="cancel"?"cancelled":"scheduled";
       result=await client.query(`UPDATE madevi_message_jobs SET status=$2,run_at=coalesce($3,now()),updated_at=now()
-        WHERE id=$1 AND (${data.action==="cancel"?"status IN ('draft','scheduled','failed')":data.action==="retry"?"status='failed' AND attempts<5":"status='draft'"})
-        AND ($2='cancelled' OR (SELECT count(*) FROM madevi_message_jobs WHERE status='scheduled')<100)`,[data.id,target,data.runAt??null]);
+        WHERE id=$1 AND ($4::timestamptz IS NULL OR date_trunc('milliseconds',updated_at)=$4) AND (${data.action==="cancel"?"status IN ('draft','scheduled','failed')":data.action==="retry"?"status='failed' AND attempts<5":"status='draft'"})
+        AND ($2='cancelled' OR (SELECT count(*) FROM madevi_message_jobs WHERE status='scheduled')<100)`,[data.id,target,data.runAt??null,data.expectedUpdated??null]);
     }
     if(!result.rowCount) {
       await client.query("ROLLBACK");
@@ -78,7 +90,9 @@ export async function POST(request:Request) {
     if(data.action==="send") {
       client.release();client=undefined;
       const dispatched=await dispatchMessages(pool,1,data.id).catch(()=>null);
-      const state=dispatched?.delivered?"sent":dispatched?.failed?"failed":"queued";
+      const persisted=(!dispatched?.delivered&&!dispatched?.failed
+        ? await pool.query("SELECT status FROM madevi_message_jobs WHERE id=$1",[data.id]).catch(()=>null):null)?.rows[0]?.status;
+      const state=dispatched?.delivered||persisted==="sent"?"sent":dispatched?.failed||persisted==="failed"?"failed":persisted==="cancelled"?"cancelled":"queued";
       return Response.json({ok:true,state},{headers});
     }
     return Response.json({ok:true},{headers});
@@ -87,3 +101,5 @@ export async function POST(request:Request) {
     return (error as {code?:string}).code==="23503" ? failure("Lampiran atau akun tidak ditemukan",409) : failure("Pesan belum tersimpan",503);
   } finally {client?.release();}
 }
+
+export const POST=observeRoute("messages.write",handlePOST);

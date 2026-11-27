@@ -2,6 +2,13 @@
 
 Nomor rilis Madevi terdiri dari empat bagian. Angka terakhir naik satu tingkat pada tiap rilis sesuai keputusan proyek. Manifest npm memakai representasi valid seperti `0.0.0-19`. Pilihan pembaruan utama di README mengikuti dampak, tanpa semantik tambahan pada angka versi.
 
+## v0.0.0.21 — kendali operasi dan pemulihan admin
+
+- Tambahkan antrean backup, verifikasi, unduhan dan restore dari panel, dengan pemeriksaan ulang identitas dan target.
+- Sediakan pemulihan riwayat pengaturan dan adapter katalog Compose untuk rilis serta profil sumber daya host.
+- Lengkapi konfirmasi kirim langsung, jadwal dan retry, serta pustaka PDF, TXT dan CSV.
+- Tambahkan ketersediaan admin, percakapan dukungan dengan catatan privat, dan metrik internal berbasis handler serta worker.
+
 ## v0.0.0.20 — fondasi ruang, panel admin, dan pemulihan
 
 - Hubungkan ruang, filter, pencarian, halaman baca dan navigasi publik ke data terbit.

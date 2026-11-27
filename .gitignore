@@ -22,3 +22,6 @@ audit-preview/.openai/
 next-env.d.ts
 playwright-report/
 test-results/
+
+# Override host lokal untuk mount cadangan baca-saja.
+/compose.download.yml

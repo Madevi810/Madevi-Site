@@ -6,7 +6,7 @@ Ikuti urutan ini untuk staging dengan data sintetis, lalu ulangi dengan konfigur
 
 - Siapkan checkout Madevi-Site, Node.js 24 dan npm di mesin operator, satu server Linux dengan Docker Compose, akses SSH yang dikuasai pemilik, dan PostgreSQL 18 yang dapat dijangkau server. Gunakan satu database per lingkungan.
 - Siapkan nama host staging dan akses DNS. Untuk jalur Compose, gunakan Caddy pada host dan sertifikat HTTPS. Port 80/443 menghadap publik, sedangkan port aplikasi tetap loopback.
-- Buat akun layanan yang dibutuhkan atas nama pemilik. SMTP diperlukan saat membuka pendaftaran email. Google bersifat opsional untuk pengguna biasa. Avatar, gambar laporan, dan pustaka gambar tetap di PostgreSQL. Contoh penyedia dan harga ada sebagai [opsi tambahan](online.md#dua-jalur).
+- Buat akun layanan yang dibutuhkan atas nama pemilik. SMTP diperlukan saat membuka pendaftaran email. Google bersifat opsional untuk pengguna biasa. Avatar, gambar laporan, dan pustaka lampiran tetap di PostgreSQL. Contoh penyedia dan harga ada sebagai [opsi tambahan](online.md#dua-jalur).
 
 ## 2. Ambil nilai dan pisahkan role
 
@@ -71,7 +71,7 @@ Migrasi menampilkan `Migrasi selesai.` jika skema telah dicatat. `check:ready` m
 ```
 
 2. Uji dari **Notifikasi & Pesan** dengan satu pengguna sintetis. Jadwalkan satu menit ke depan. Sebelum waktu jatuh tempo, pekerjaan tetap terjadwal. Setelah worker berjalan, lihat status pengiriman dan pesan pada akun tujuan. Log worker memuat jumlah pekerjaan terkirim/gagal tanpa isi pesan. Gunakan file log yang dirotasi atau fasilitas logging host dan alarm untuk kegagalan worker.
-3. Ikuti [backup terenkripsi](../ops/backup-restore.md) untuk menyiapkan `MADEVI_BACKUP_DIR`, `MADEVI_BACKUP_KEY`, akses PostgreSQL dan alat klien. Jalankan backup, periksa tag, pulihkan ke database terpisah dan periksa riwayat dari admin. Atur retensi dan lokasi salinan sesuai RPO/RTO yang disetujui.
+3. Ikuti [operasi admin](operasi-admin.md#persiapan-worker-pada-host) untuk `npm run jobs:operations`, backup terenkripsi, target kosong, mount unduhan, dan katalog rollback Compose. Uji alur pengajuan dan pantau riwayat dari admin. Siapkan retensi dan lokasi salinan sesuai sasaran pemulihan.
 4. Pantau liveness dan readiness dari origin tujuan dan uji setidaknya satu alur pendaftaran/email, akses admin, publikasi, lampiran, pengiriman terjadwal, dan pemulihan pada staging. [Panduan admin](admin.md)
 
 ## 7. Kenali kegagalan dan pulihkan

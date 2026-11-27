@@ -60,6 +60,6 @@ OAuth memungkinkan pengguna memberi izin kepada Google untuk mengonfirmasi ident
 
 ## Penyimpanan dan monitoring · sesuai tahap
 
-Avatar dan bukti laporan saat ini disimpan dalam PostgreSQL. Folder `public/` hanya untuk aset situs yang boleh diakses siapa saja. Uji unggahan dan akses yang berhak, lalu pastikan gambar ikut dalam latihan backup. Object storage untuk media terpisah membutuhkan perubahan kode dan migrasi. [Peta layanan media](ganti-layanan.md)
+Avatar, bukti laporan, dan pustaka lampiran disimpan di PostgreSQL. Folder `public/` hanya untuk aset situs yang boleh diakses siapa saja. Uji unggahan dan akses yang berhak, lalu pastikan gambar dan dokumen ikut dalam latihan backup. Object storage untuk media terpisah membutuhkan perubahan kode dan migrasi. [Peta layanan media](ganti-layanan.md)
 
 Monitoring adalah pemeriksaan berkala yang mengirim alarm saat kondisi memburuk. Untuk operasi, siapkan tujuan notifikasi internal, penanggung jawab dan ambang. Masukkan URL probe di layanan monitoring pilihan, atur polling dan ulang percobaan, lalu uji alarm pada lingkungan sintetis. Periksa pula log error, kuota database dan job backup. [Prosedur operasi](operasional.md)

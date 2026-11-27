@@ -1,0 +1,20 @@
+{
+  "directory": "/srv/madevi/operations",
+  "project": "madevi",
+  "releases": [
+    {
+      "id": "current",
+      "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "migrations": ["001_foundation", "002_notifications", "003_activation_security", "004_admin_foundation", "005_admin_operations"]
+    },
+    {
+      "id": "previous",
+      "image": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "migrations": ["001_foundation", "002_notifications", "003_activation_security", "004_admin_foundation"]
+    }
+  ],
+  "configurations": [
+    {"id": "normal", "cpus": 1, "memoryMiB": 768},
+    {"id": "larger", "cpus": 2, "memoryMiB": 1536}
+  ]
+}

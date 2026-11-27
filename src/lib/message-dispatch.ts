@@ -1,6 +1,10 @@
 import type { Pool } from "pg";
 import { accountRestricted } from "./account-status.ts";
 
+// All callers join the job as j and the recipient as u.
+export const messageAudience=`(j.audience<>'user' OR u.id=j.recipient_id)
+  AND NOT ${accountRestricted} AND (j.audience IN ('all','user') OR (j.audience='verified')=u."emailVerified")`;
+
 export async function dispatchMessages(pool:Pool, batch = 10, requestedId?:string) {
   const client = await pool.connect();
   let delivered = 0, failed = 0;
@@ -18,9 +22,8 @@ export async function dispatchMessages(pool:Pool, batch = 10, requestedId?:strin
         const sent = await client.query(`INSERT INTO madevi_notifications(id,category,recipient_id,title,body,created_by,job_id)
           SELECT gen_random_uuid(),'system',u.id,replace(replace(j.title,'{{nama}}',left(u.name,80)),'{{situs}}','Madevi'),
           replace(replace(j.body,'{{nama}}',left(u.name,80)),'{{situs}}','Madevi'),j.author,j.id
-          FROM madevi_message_jobs j JOIN "user" u ON j.audience <> 'user' OR u.id=j.recipient_id
-          WHERE j.id=$1 AND NOT ${accountRestricted} AND
-          (j.audience IN ('all','user') OR (j.audience='verified')=u."emailVerified")
+          FROM madevi_message_jobs j JOIN "user" u ON ${messageAudience}
+          WHERE j.id=$1
           ON CONFLICT DO NOTHING`,[jobId]);
         if(!sent.rowCount) throw Error("no-recipients");
         await client.query(`UPDATE madevi_message_jobs SET status='sent',attempts=attempts+1,

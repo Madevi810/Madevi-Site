@@ -1,6 +1,6 @@
 # Backup terenkripsi dan pemulihan Madevi
 
-Pekerjaan standar berjalan di host operasi yang dikuasai pemilik. Riwayat dicatat di PostgreSQL dan terlihat pada **Database & Pemulihan**. Host perlu PostgreSQL client yang kompatibel dengan versi server, Node.js 24, akses database melalui role yang tepat, direktori privat, dan ruang penyimpanan. Image aplikasi berisi skrip dan memakai PostgreSQL sebagai sumber data tunggal. Pasang `pg_dump` dan `pg_restore` pada mesin operator. Siapkan scheduler dan tempat salinan sesuai kebijakan pemilik.
+Pekerjaan standar berjalan di host operasi yang dikuasai pemilik. Riwayat dicatat di PostgreSQL dan terlihat pada **Database & Pemulihan**. Host perlu PostgreSQL client yang kompatibel dengan versi server, Node.js 24, akses database melalui role yang tepat, direktori privat, dan ruang penyimpanan. Image aplikasi berisi skrip dan memakai PostgreSQL sebagai sumber data tunggal. Pasang `pg_dump` dan `pg_restore` pada mesin operator. Siapkan scheduler dan tempat salinan sesuai kebijakan pemilik. Untuk pengajuan melalui panel, gunakan [worker operasi admin](../docs/operasi-admin.md).
 
 ## Siapkan akses, direktori, dan kunci
 

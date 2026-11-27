@@ -14,7 +14,7 @@ import { Pool } from "pg";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const loopback = "127.0.0.1";
 const imageNames = [
-  "beranda-desktop.png", "beranda-ponsel.png", "sidebar.png", "profil.png", "admin.png",
+  "beranda-desktop.png", "beranda-ponsel.png", "sidebar.png", "profil.png", "admin.png", "admin-pemulihan.png",
 ];
 
 async function listen(server) {
@@ -115,7 +115,8 @@ try {
     DATABASE_URL: url.toString(),
     SMTP_HOST:"", SMTP_PORT:"", SMTP_USER:"", SMTP_PASS:"", MAIL_FROM:"",
     GOOGLE_CLIENT_ID:"", GOOGLE_CLIENT_SECRET:"", MADEVI_PROXY_SECRET:"", MEDIA_BACKEND:"postgres",
-    MADEVI_BACKUP_DIR:"", MADEVI_BACKUP_KEY:"",
+    MADEVI_BACKUP_DIR:"", MADEVI_BACKUP_KEY:"", MADEVI_BACKUP_DOWNLOAD_DIR:"",
+    MADEVI_RESTORE_DATABASE_URL:"", MADEVI_HOST_CATALOG:"",
     MADEVI_QA_HIDE_DEV_INDICATOR:"1",
     BETTER_AUTH_URL: origin,
     BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
@@ -174,6 +175,10 @@ try {
   await admin.getByRole("heading", { name: "Dashboard" }).waitFor();
   await admin.getByText("Terhubung", { exact: true }).waitFor();
   await capture(admin, directory, imageNames[4]);
+  await admin.goto(`${origin}/admin?panel=system`);
+  await admin.getByRole("heading",{name:"Database & Pemulihan",exact:true}).waitFor();
+  await admin.getByRole("heading",{name:"Ajukan pekerjaan",exact:true}).waitFor();
+  await capture(admin,directory,imageNames[5]);
 
   const output = join(root, "docs", "screenshots");
   await mkdir(output, { recursive: true });

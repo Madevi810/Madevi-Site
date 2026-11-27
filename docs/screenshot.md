@@ -23,8 +23,9 @@ Skrip menjalankan aplikasi asli dari checkout pada port loopback dinamis. Ia mem
 | `sidebar.png` | Sidebar menu terbuka dengan navigasi ruang dan kartu developer. |
 | `profil.png` | Tab Status setelah login sebagai Madevi-User. |
 | `admin.png` | Dashboard setelah login sebagai Madevi-Admin dengan MFA pada lingkungan pengujian. |
+| `admin-pemulihan.png` | Panel Database & Pemulihan dalam kondisi worker host belum dikonfigurasi. |
 
-Buka kelimanya pada resolusi asli. Periksa bahwa isi sesuai judul, ukuran masuk akal, teks terbaca, gambar dan font tampil, serta tidak ada dialog kesalahan, data nyata, password atau kode pemulihan. Lihat preview [README](../README.md#cuplikan-aplikasi-lokal) dan jalankan `git status --short` untuk melihat gambar yang diperbarui. Jika UI berubah, simpan screenshot yang terdampak dan sesuaikan konteks sumber pada keterangan README saat diperlukan.
+Buka semua hasil pada resolusi asli. Periksa bahwa isi sesuai judul, ukuran masuk akal, teks terbaca, gambar dan font tampil, serta tidak ada dialog kesalahan, data nyata, password atau kode pemulihan. Lihat preview [README](../README.md#cuplikan-aplikasi-lokal) dan jalankan `git status --short` untuk melihat gambar yang diperbarui. Jika UI berubah, simpan screenshot yang terdampak dan sesuaikan konteks sumber pada keterangan README saat diperlukan.
 
 ## Jika gagal
 
@@ -32,4 +33,4 @@ Buka kelimanya pada resolusi asli. Periksa bahwa isi sesuai judul, ukuran masuk 
 - Port loopback ditolak. Jalankan pada mesin pengembangan yang mengizinkan aplikasi dan database mendengarkan `127.0.0.1`. Tidak perlu membuka akses publik.
 - Aplikasi belum siap atau login gagal. Periksa pesan migrasi dan Next.js di terminal. Jalankan dari checkout yang memiliki dependensi dan migrasi lengkap. Jangan melewati aturan demo atau MFA aplikasi.
 - Pemuatan font/gambar atau selector gagal. Periksa file di `public/` dan tampilan lokal. Jika nama kontrol memang berubah, perbarui langkah di [scripts/screenshots.mjs](../scripts/screenshots.mjs).
-- Gambar hanya disalin setelah semua sesi tangkap selesai. Bila proses berhenti sebelum itu, galeri masih berisi hasil sebelumnya. Jika penyimpanan output gagal, periksa ruang serta izin tulis, lalu ulangi perintah dan tinjau kelima hasil.
+- Gambar hanya disalin setelah semua sesi tangkap selesai. Bila proses berhenti sebelum itu, galeri masih berisi hasil sebelumnya. Jika penyimpanan output gagal, periksa ruang serta izin tulis, lalu ulangi perintah dan tinjau semua hasil.

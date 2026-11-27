@@ -34,6 +34,7 @@ jobs:
       - run: npm run test:integration
         env:
           MADEVI_TEST_DATABASE_URL: postgresql://madevi_test:local-test-only@127.0.0.1:25435/madevi_ci_test
+          MADEVI_TEST_DOCKER_CONTAINER: ${{ job.services.postgres.id }}
           MADEVI_TEST_BUILD: "1"
           MADEVI_TEST_LOAD: "1"
           MADEVI_VISUAL_CHECK: "1"

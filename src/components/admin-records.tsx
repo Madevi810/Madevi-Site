@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { rooms } from "@/lib/rooms";
 import { AdminHeading, AdminLoading, AdminPageNav, adminJson, adminRequest, dateInput, localDate, useAdminData, value, values } from "./admin-data";
+import { OperationsMonitoring } from "./operations-monitoring";
+import { SupportAvailability, SupportInbox } from "./support-inbox";
 import { adminPanel, fieldLabel, inputControl, primaryButton, statusMessage, textAreaControl, textButton } from "./styles";
 
 type Count={status:string;count:number};
@@ -55,6 +57,7 @@ export function AdminSummary({mode,navigate}:{mode:"dashboard"|"statistics"|"sec
       <p>SMTP {data.integrations.smtp?"terkonfigurasi, pengiriman perlu diuji":"belum dikonfigurasi"}. Google {data.integrations.google?"terkonfigurasi, callback perlu diuji":"belum dikonfigurasi"}.</p>
       <p>Pemeriksaan halaman ini membaca data aplikasi. Pantauan uptime dan kapasitas disk host memerlukan monitor di lingkungan deployment.</p>
     </section>}
+    {mode==="statistics"&&<OperationsMonitoring/>}
     {mode==="security"&&<p><a href="/admin/security">Lihat status autentikator</a></p>}
     {mode!=="dashboard"&&<section className={adminPanel}><h2>Peristiwa keamanan 24 jam</h2>{data.events.length?<ul>{data.events.map(row=><li key={row.event+row.outcome}>{row.event} · {row.outcome} · {row.count}</li>)}</ul>:<p>Nol peristiwa tercatat.</p>}</section>}
     <section className={adminPanel}><h2>Aktivitas terbaru</h2><p>Maksimal 20 entri audit admin terbaru.</p>
@@ -132,6 +135,7 @@ export function AdminRules() {
   const [edit,setEdit]=useState<Rule>(), [message,setMessage]=useState(""), [pending,setPending]=useState(false);
   const {data,error,reload}=useAdminData<{rules:Rule[]}>("/api/admin/support");
   return <><AdminHeading description="Gunakan jawaban tetap. Semua laporan tetap masuk antrean untuk admin.">Asisten & Respons Otomatis</AdminHeading>
+  <SupportAvailability/><SupportInbox admin/>
   <section className={adminPanel}><h2>{edit?"Edit aturan":"Buat aturan"}</h2>
     <form key={edit?.id??"new"} className="grid gap-3" onSubmit={async event=>{
       event.preventDefault();const form=event.currentTarget,data=values(form);setPending(true);setMessage("");

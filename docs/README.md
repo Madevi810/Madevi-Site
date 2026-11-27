@@ -17,9 +17,9 @@ Ikuti urutan ini dari memahami aplikasi sampai menyiapkan operasi. Panduan layan
 
 ## Rujukan lain
 
-- [Panduan panel admin dan alur kerja](admin.md) serta [backup dan pemulihan](../ops/backup-restore.md).
+- [Panduan panel admin dan alur kerja](admin.md), [operasi dan pemulihan admin](operasi-admin.md) serta [backup dan pemulihan](../ops/backup-restore.md).
 - [Cara memperbarui screenshot](screenshot.md), [pemetaan arsip Pondasi](referensi-pondasi.md) dan [prioritas pengembangan](lanjutan.md).
-- [Laporan fondasi admin](laporan-fondasi-admin.md), [laporan kesiapan default](laporan-kesiapan.md), [laporan screenshot dan dokumentasi](laporan-lanjutan.md), [laporan penataan sebelumnya](laporan-penataan.md), [bukti lokal v17](../ops/verification-v17.md) dan [CHANGELOG](../CHANGELOG.md).
+- [Laporan penyempurnaan admin](laporan-penyempurnaan-admin.md), [laporan fondasi admin](laporan-fondasi-admin.md), [laporan kesiapan default](laporan-kesiapan.md), [laporan screenshot dan dokumentasi](laporan-lanjutan.md), [laporan penataan sebelumnya](laporan-penataan.md), [bukti lokal v17](../ops/verification-v17.md) dan [CHANGELOG](../CHANGELOG.md).
 - [Demo terbatas](../ops/demo-terbatas.md), [contoh proxy](../ops/reverse-proxy.example.md), [respons insiden](../ops/incident-response.md) dan [tata kelola data](../ops/data-governance.md).
 
 [AGENTS.md](../AGENTS.md) memuat instruksi kerja agent di repositori.

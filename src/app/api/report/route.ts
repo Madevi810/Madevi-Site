@@ -1,3 +1,4 @@
+import { observeRoute } from "@/lib/monitoring";
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { currentAccount } from "@/lib/access";
@@ -9,7 +10,7 @@ import sharp from "sharp";
 export const runtime="nodejs";
 const url=z.string().trim().max(2048).refine(v=>{if(!v)return true;try{const u=new URL(v);return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password}catch{return false}});
 const schema=z.object({message:z.string().trim().min(10).max(1000),url:url.optional().default('')});
-export async function POST(request:Request){
+async function handlePOST(request:Request){
  if(!sameOrigin(request))return NextResponse.json({error:"Permintaan tidak valid."},{status:403});
  let data:unknown;let image:Buffer|null=null;
  try{if((request.headers.get('content-type')||'').startsWith('multipart/form-data')){const bytes=await readLimitedBody(request,2200000);const f=await new Response(new Uint8Array(bytes).buffer,{headers:{'content-type':request.headers.get('content-type')||''}}).formData();data={message:f.get('message'),url:f.get('url')||''};const file=f.get('image');if(file instanceof File&&file.size){if(file.size>2000000||!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error();const source=sharp(Buffer.from(await file.arrayBuffer()),{limitInputPixels:16000000});const meta=await source.metadata();if(!['jpeg','png','webp'].includes(meta.format||''))throw Error();image=await source.rotate().resize(1600,1600,{fit:'inside',withoutEnlargement:true}).webp({quality:75}).toBuffer()}}else data=await bodyJson(request)}catch{return NextResponse.json({error:"Foto atau data laporan tidak valid."},{status:400})}
@@ -46,3 +47,5 @@ export async function POST(request:Request){
   client?.release();
  }
 }
+
+export const POST=observeRoute("report.write",handlePOST);
