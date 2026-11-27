@@ -15,6 +15,10 @@ Ikuti urutan ini dari memahami aplikasi sampai menyiapkan operasi. Panduan layan
 | G. Jalankan online | [Jalankan dan periksa aplikasi](online.md#4-jalankan-aplikasi-dan-periksa-layanan) serta [checklist](../ops/deploy-checklist.md) | Verifikasi sebelum dan sesudah aktivasi staging, lalu nilai kesiapan produksi. |
 | H. Pelihara dan pindah | [Operasional](operasional.md) dan [Jika Saya Mengganti Layanan atau API](ganti-layanan.md) | Siapkan backup, restore, monitoring, pergantian provider dan rollback. |
 
+## Keamanan
+
+Baca [model akses dan prosedur pemulihan](keamanan.md) dan [hasil pengujian keamanan](laporan-keamanan.md).
+
 ## Rujukan lain
 
 - [Panduan panel admin dan alur kerja](admin.md), [operasi dan pemulihan admin](operasi-admin.md) serta [backup dan pemulihan](../ops/backup-restore.md).

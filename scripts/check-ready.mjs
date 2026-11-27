@@ -20,7 +20,27 @@ if (issues.length) {
       console.error(readiness === "schema_pending"
         ? "Skema belum siap. Jalankan npm run db:migrate dengan role migrasi."
         : "Database belum siap. Periksa koneksi, TLS dan izin role runtime.");
-    } else console.log("Database: dapat diakses dan skema Madevi tersedia.");
+    } else {
+      console.log("Database: dapat diakses dan skema Madevi tersedia.");
+      if(["production","staging"].includes(process.env.MADEVI_ENV)) {
+        const {rows}=await pool.query(`SELECT
+          NOT has_schema_privilege(current_user,'public','CREATE')
+          AND has_table_privilege(current_user,'public.madevi_audit','INSERT')
+          AND NOT has_table_privilege(current_user,'public.madevi_audit','UPDATE')
+          AND NOT has_table_privilege(current_user,'public.madevi_audit','DELETE')
+          AND NOT has_table_privilege(current_user,'public.madevi_audit','TRUNCATE')
+          AND NOT has_column_privilege(current_user,'public."user"','madeviRole','UPDATE')
+          AND NOT has_column_privilege(current_user,'public.madevi_operations','status','UPDATE')
+          AS restricted`);
+        if(!rows[0]?.restricted) {
+          process.exitCode=1;
+          console.error("Role web masih memiliki hak berlebihan atau belum dapat menambah audit. Terapkan contoh role setelah migrasi.");
+        } else console.log("Role web: pembatasan skema, audit dan status operasi terverifikasi.");
+      }
+    }
+  } catch {
+    process.exitCode=1;
+    console.error("Pemeriksaan role database belum dapat diselesaikan.");
   } finally {
     await pool.end();
   }

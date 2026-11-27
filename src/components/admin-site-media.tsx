@@ -77,12 +77,21 @@ export function AdminSite({mode}:{mode:"pages"|"settings"}) {
   </>;
 }
 
-type ImageRecord={id:string;name:string;mime_type:string;visibility:string;bytes:number;linked:boolean};
+type ImageRecord={id:string;name:string;mime_type:string;visibility:string;publication_reviewed_at:string|null;bytes:number;linked:boolean};
 export function AdminMedia() {
   const [page,setPage]=useState(1),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
   const [retry,setRetry]=useState(false);
   const attempt=useRef<FormData|null>(null), uploading=useRef(false);
   const list=useAdminData<{items:ImageRecord[];next:boolean}>(`/api/admin/media?page=${page}`);
+  async function approvePublication(item:ImageRecord) {
+    if(busy||!window.confirm("Sumber dan isi dokumen telah diperiksa secara manual dan dokumen boleh dipublikasikan?"))return;
+    setBusy(true);setMessage("");
+    try {
+      await adminRequest("/api/admin/media",adminJson("PATCH",{id:item.id,publicationChecked:true}));
+      list.reload();setMessage("Tinjauan publikasi dicatat.");
+    } catch(error){setMessage((error as Error).message);}
+    finally{setBusy(false);}
+  }
   async function remove(item:ImageRecord) {
     if(!window.confirm(`Hapus berkas ${item.name}?`))return;
     setBusy(true);setMessage("");
@@ -111,6 +120,7 @@ export function AdminMedia() {
       <label className={fieldLabel}>Nama<input className={inputControl} name="name" disabled={busy||retry} required maxLength={120}/></label>
       <label className={fieldLabel}>Visibilitas<select className={inputControl} name="visibility" disabled={busy||retry}><option value="private">Privat, untuk admin atau penerima pesan</option><option value="public">Publik saat revisi terkait diterbitkan</option></select></label>
       <label className={fieldLabel}>Berkas<input className={inputControl} name="file" disabled={busy||retry} type="file" accept="image/jpeg,image/png,image/webp,.pdf,.txt,.csv" required/></label>
+      <label><input type="checkbox" name="publicationChecked" disabled={busy||retry}/> Untuk dokumen publik, saya telah memeriksa sumber dan isi berkas secara manual.</label>
       <button className={primaryButton} disabled={busy}>{retry?"Periksa dengan coba kembali":"Unggah berkas"}</button>
     </form>{message&&<p role="status" className={statusMessage}>{message}</p>}
   </section>
@@ -118,6 +128,8 @@ export function AdminMedia() {
     {list.data.items.length?list.data.items.map(item=><div key={item.id} className="border-b border-madevi-line py-3">
       <a href={`/api/media/${item.id}`}>{item.name}</a><p>{item.visibility==="public"?"Publik saat ditautkan":"Privat"} · {item.mime_type} · {item.bytes} byte · {item.linked?"Dipakai pada revisi atau pesan":"Belum dipakai"}</p>
       <label className={fieldLabel}>ID lampiran<input className={inputControl} readOnly value={item.id} onFocus={e=>e.currentTarget.select()}/></label>
+      {item.visibility==="public"&&item.mime_type!=="image/webp"&&!item.publication_reviewed_at&&
+        <button className={textButton} disabled={busy||retry} onClick={()=>void approvePublication(item)}>Catat tinjauan publikasi</button>}
       {!item.linked&&<button className={textButton} disabled={busy||retry} onClick={()=>void remove(item)}>Hapus berkas</button>}
     </div>):<p>Belum ada berkas di halaman ini.</p>}
     <AdminPageNav page={page} next={list.data.next} move={setPage}/>

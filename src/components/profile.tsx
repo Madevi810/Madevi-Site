@@ -5,6 +5,7 @@ import { UserRound, LogOut, MessageCircle, Bookmark, GraduationCap, ShoppingBag,
 import { PhotoEditor } from "./photo-editor";
 import { authClient } from "@/lib/auth-client";
 import { Field } from "./ui";
+import { AccountPassword, SessionManager } from "./session-manager";
 import { SocialProfileSettings } from "./social-profile-settings";
 import { profilePane, pillTabs, pillButton, pillActive, pillInactive, profileContent, logout, fineText, primaryButton, outlineButton, formLayout, statusMessage, textButton } from "./styles";
 type View = "signin" | "signup" | "forgot" | "reset";
@@ -388,7 +389,7 @@ function ProfileSettings({
       if (r.ok) {onProfileUpdate({username,city}); await refetch();}
       } catch { setMessage(t("Profil belum tersimpan.", "Profile not saved.")); }
       finally {setSaving(false);}
-    }}><fieldset disabled={!loaded || saving} className={`m-0 min-w-0 border-0 p-0 ${formLayout}`}><h3>{t("Pengaturan akun", "Account settings")}</h3><div className="flex flex-col gap-madevi-8">{([[t("Nama lengkap", "Full name"), "name"], [t("Tanggal lahir", "Date of birth"), "date"], [t("Kota asal", "City of origin"), "city"], [t("Nomor telepon (opsional)", "Phone (optional)"), "phone"]] as const).map(([label, key]) => <details key={key} className="rounded-madevi-20 border border-madevi-line bg-madevi-surface"><summary className="flex cursor-pointer list-none items-center justify-between gap-madevi-12 px-madevi-15 py-madevi-13 font-bold">{label}<ChevronRight size={17} /></summary><div className="px-madevi-15 pb-madevi-13"><Field label={label} type={key === "date" ? "date" : key === "phone" ? "tel" : "text"} value={key === "name" ? value : key === "date" ? birthDate : key === "city" ? city : phone} onChange={e => {const next=e.target.value;if(key === "name")setValue(next);else if(key === "date")setBirthDate(next);else if(key === "city")setCity(next);else setPhone(next);}} onInvalid={e => e.currentTarget.closest("details")?.setAttribute("open", "")} required={key !== "phone"} maxLength={key === "name" || key === "city" ? 100 : key === "phone" ? 30 : undefined} /></div></details>)}<div className="rounded-madevi-pill border border-madevi-line px-madevi-15 py-madevi-13 text-madevi-muted">Username {username && `· @${username}`} · {t("tidak dapat diubah", "cannot be changed")}</div></div><button className={`${primaryButton} w-full`}>{t("Simpan perubahan", "Save changes")}</button></fieldset></form>{!loaded && <button type="button" className={outlineButton} onClick={() => setRetry(n => n + 1)}>{t("Muat ulang profil", "Reload profile")}</button>}<SocialProfileSettings english={english} /><EmailChange currentEmail={email} english={english} onUpdated={refetch} /><button type="button" className={`${outlineButton} w-full`} onClick={onReset}>{t("Atur ulang kata sandi dengan email", "Reset password by email")}</button>{message && <p role="status">{message}</p>}</>;
+    }}><fieldset disabled={!loaded || saving} className={`m-0 min-w-0 border-0 p-0 ${formLayout}`}><h3>{t("Pengaturan akun", "Account settings")}</h3><div className="flex flex-col gap-madevi-8">{([[t("Nama lengkap", "Full name"), "name"], [t("Tanggal lahir", "Date of birth"), "date"], [t("Kota asal", "City of origin"), "city"], [t("Nomor telepon (opsional)", "Phone (optional)"), "phone"]] as const).map(([label, key]) => <details key={key} className="rounded-madevi-20 border border-madevi-line bg-madevi-surface"><summary className="flex cursor-pointer list-none items-center justify-between gap-madevi-12 px-madevi-15 py-madevi-13 font-bold">{label}<ChevronRight size={17} /></summary><div className="px-madevi-15 pb-madevi-13"><Field label={label} type={key === "date" ? "date" : key === "phone" ? "tel" : "text"} value={key === "name" ? value : key === "date" ? birthDate : key === "city" ? city : phone} onChange={e => {const next=e.target.value;if(key === "name")setValue(next);else if(key === "date")setBirthDate(next);else if(key === "city")setCity(next);else setPhone(next);}} onInvalid={e => e.currentTarget.closest("details")?.setAttribute("open", "")} required={key !== "phone"} maxLength={key === "name" || key === "city" ? 100 : key === "phone" ? 30 : undefined} /></div></details>)}<div className="rounded-madevi-pill border border-madevi-line px-madevi-15 py-madevi-13 text-madevi-muted">Username {username && `· @${username}`} · {t("tidak dapat diubah", "cannot be changed")}</div></div><button className={`${primaryButton} w-full`}>{t("Simpan perubahan", "Save changes")}</button></fieldset></form>{!loaded && <button type="button" className={outlineButton} onClick={() => setRetry(n => n + 1)}>{t("Muat ulang profil", "Reload profile")}</button>}<SocialProfileSettings english={english} /><SessionManager english={english}/><AccountPassword english={english}/><EmailChange currentEmail={email} english={english} onUpdated={refetch} /><button type="button" className={`${outlineButton} w-full`} onClick={onReset}>{t("Atur ulang kata sandi dengan email", "Reset password by email")}</button>{message && <p role="status">{message}</p>}</>;
 }
 function PasswordRecovery({
   email,
@@ -444,7 +445,7 @@ function PasswordRecovery({
       }
     }}>{stage === "reset" && <><Field label={t("Kode OTP email", "Email OTP code")} name="otp" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required /><Field label={t("Kata sandi baru", "New password")} name="password" type="password" revealLabels={{show:t("Tampilkan kata sandi","Show password"),hide:t("Sembunyikan kata sandi","Hide password")}} minLength={10} required /><Field label={t("Konfirmasi kata sandi", "Confirm password")} name="confirm" type="password" revealLabels={{show:t("Tampilkan kata sandi","Show password"),hide:t("Sembunyikan kata sandi","Hide password")}} required /></>}{message && <p role="status" className={statusMessage}>{message}</p>}<button className={primaryButton}>{stage === "request" ? t("Kirim kode OTP", "Send OTP code") : t("Atur ulang kata sandi", "Reset password")}</button><button type="button" className={textButton} onClick={onBack}>{t("Kembali", "Back")}</button></form></div>;
 }
-function EmailChange({
+export function EmailChange({
   currentEmail,
   english,
   onUpdated
@@ -471,10 +472,14 @@ function EmailChange({
             newEmail: nextEmail,
             otp: String(f.get("otp") || "")
           } : {
-            newEmail: email
+            newEmail: email, password: String(f.get("password") || "")
           })
         });
-        if (!r.ok) throw Error();
+        if (!r.ok) {
+          const failure=await r.json().catch(()=>null);
+          if(typeof failure?.error==="string"){setMessage(failure.error);return;}
+          throw Error();
+        }
         if (stage) {
           setMessage(t("Email diperbarui.", "Email updated."));
           setStage(false);
@@ -488,5 +493,5 @@ function EmailChange({
       } catch {
         setMessage(t("Permintaan belum berhasil. Coba masuk kembali atau ulangi.", "Request failed. Sign in again or retry."));
       }
-    }}><Field label={t("Email baru", "New email")} name="newEmail" type="email" value={nextEmail} onChange={e => setNextEmail(e.target.value)} disabled={stage} required={!stage} />{stage && <Field label={t("Kode OTP email baru", "New email OTP code")} name="otp" pattern="[0-9]{6}" inputMode="numeric" maxLength={6} required />}{message && <p role="status" className={statusMessage}>{message}</p>}<button className={outlineButton}>{stage ? t("Verifikasi email", "Verify email") : t("Kirim kode", "Send code")}</button>{stage && <button type="button" className={textButton} onClick={() => setStage(false)}>{t("Ubah alamat", "Change address")}</button>}</form></details>;
+    }}><Field label={t("Email baru", "New email")} name="newEmail" type="email" value={nextEmail} onChange={e => setNextEmail(e.target.value)} disabled={stage} required={!stage} />{!stage && <Field label={t("Kata sandi saat ini", "Current password")} name="password" type="password" autoComplete="current-password" maxLength={128} required/>}{stage && <Field label={t("Kode OTP email baru", "New email OTP code")} name="otp" pattern="[0-9]{6}" inputMode="numeric" maxLength={6} required />}{message && <p role="status" className={statusMessage}>{message}</p>}<button className={outlineButton}>{stage ? t("Verifikasi email", "Verify email") : t("Kirim kode", "Send code")}</button>{stage && <button type="button" className={textButton} onClick={() => setStage(false)}>{t("Ubah alamat", "Change address")}</button>}</form></details>;
 }

@@ -146,11 +146,19 @@ try {
     await capture(page, directory, filename);
   }
 
-  await desktop.getByRole("button", { name: "Buka menu" }).click();
-  await desktop.getByText("Ruang Madevi", { exact: true }).last().waitFor();
+  const drawer = desktop.getByRole("dialog", { name: "Madevi", exact: true });
+  const openMenu = desktop.getByRole("button", { name: "Buka menu", exact: true });
+  // Static markup can be clickable before the development bundle hydrates.
+  for (let attempt = 0; attempt < 3 && !await drawer.isVisible(); attempt++) {
+    await openMenu.click();
+    await drawer.waitFor({ timeout: 3000 }).catch(error => {
+      if (error.name !== "TimeoutError") throw error;
+    });
+  }
+  await drawer.getByRole("navigation", { name: "Ruang Madevi", exact: true }).waitFor();
   await capture(desktop, directory, imageNames[2]);
 
-  await desktop.getByRole("button", { name: "Profil", exact: true }).click();
+  await drawer.getByRole("button", { name: "Profil", exact: true }).click();
   await signIn(desktop, "Madevi-User", password);
   await desktop.getByRole("button", { name: "Keluar", exact: true }).waitFor();
   await desktop.getByRole("heading", { name: "Madevi-User", exact: true }).waitFor();

@@ -2,6 +2,7 @@ import { twoFactor, username, emailOTP } from "better-auth/plugins";
 import { accountRestricted } from "./account-status.ts";
 import { pool } from "./db.ts";
 import { createSmtpTransport } from "./mail.ts";
+import { memberSessionSeconds, privilegedSessionSeconds } from "./session-policy.ts";
 import type { BetterAuthOptions } from "better-auth";
 import { isDemoAllowed } from "./config.ts";
 import { authOrigin, googleSettings, smtpSettings, validateEnvironment } from "./env.ts";
@@ -38,6 +39,9 @@ export const authOptions = {
     cookies: { trust_device: { name: "madevi.mfa_device" } },
   },
   session: {
+    expiresIn: memberSessionSeconds,
+    disableSessionRefresh: true,
+    cookieCache: {enabled:false},
     additionalFields: { madeviMfa: { type: "boolean", defaultValue: false, input: false, returned: false } },
   },
   socialProviders: googleConfig ? {
@@ -47,6 +51,7 @@ export const authOptions = {
     enabled: true,
     requireEmailVerification: true,
     minPasswordLength: 10,
+    maxPasswordLength: 128,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }: { user: { email: string }, url: string }) => sendMail(user.email, url, "Atur ulang kata sandi MADEVI"),
   },
@@ -76,7 +81,8 @@ export const authOptions = {
       if (!user || user.suspended || !user.emailVerified || (user.isDemo && !isDemoAllowed())) return false;
       if (isPrivileged(user.madeviRole) && !privilegedSessionPath(context?.path)) denyPrivilegedOAuth();
       // Credential login and legacy sessions start without administrative assurance.
-      return { data: { ...session, madeviMfa: verifiedMfaPath(context?.path) } };
+      return { data: { ...session, madeviMfa: verifiedMfaPath(context?.path),
+        ...(isPrivileged(user.madeviRole) ? { expiresAt: new Date(Date.now()+privilegedSessionSeconds*1000) } : {}) } };
     } } },
   },
   plugins: [emailOTP({otpLength:6,expiresIn:600,allowedAttempts:3,storeOTP:"hashed",disableSignUp:true,changeEmail:{enabled:true,verifyCurrentEmail:false},rateLimit:{window:60,max:3},sendVerificationOTP:async({email,otp,type})=>{if(type!=="forget-password"&&type!=="change-email")throw new Error("Jenis OTP tidak didukung");await sendMail(email,`Kode OTP: ${otp}\nBerlaku 10 menit dan hanya sekali pakai.`,type==="change-email"?"Verifikasi email baru MADEVI":"Atur ulang kata sandi MADEVI")}}), username({ immutableUsername: true, usernameValidator: (value: string) => /^[a-zA-Z0-9_.-]{3,30}$/.test(value) }), twoFactor({ issuer: "MADEVI", trustDeviceMaxAge: 0 })],

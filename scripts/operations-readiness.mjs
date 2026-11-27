@@ -10,7 +10,7 @@ import { checkDatabaseReadiness } from "../src/lib/readiness.ts";
 import { createDatabasePool } from "../src/lib/postgres.ts";
 import { backupConfiguration, targetConfiguration } from "./encrypted-database.mjs";
 import { hostProfile } from "./host-profile.mjs";
-import { integerSetting, maintenanceSettings } from "./maintenance.mjs";
+import { integerSetting, maintenanceConnection, maintenanceSettings } from "./maintenance.mjs";
 import { alertSettings } from "./alarm-settings.mjs";
 
 const execute=promisify(execFile);
@@ -77,6 +77,7 @@ export async function localChecks() {
   } catch {checks.alert=row(status.failed,"Periksa penerima, SMTP, ambang dan direktori privat alarm.");}
   try {
     const settings=maintenanceSettings();
+    if(settings.mode==="prune")maintenanceConnection(settings.mode);
     const hours=integerSetting(process.env.MADEVI_ROUTINE_BACKUP_HOURS,0,0,720);
     checks.schedule=row(hours&&!backupResult.backup?status.failed:status.operator,
       hours&&!backupResult.backup?"Backup rutin diminta tetapi operasi backup belum siap.":

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { hashPassword } from 'better-auth/crypto';
 
 // Uses only the disposable integration database, never a real user's account.
-export async function verifyRegressionJourneys({browser,origin,env,db}) {
+export async function verifyRegressionJourneys({browser,origin,env,db,currentTotp}) {
   const password=` ${env.DEMO_PASSWORD} `;
   await db.exec(`UPDATE account SET password='${await hashPassword(password)}' WHERE "userId"=(SELECT id FROM "user" WHERE username='madevi-user')`);
   const context=await browser.newContext({viewport:{width:768,height:1024}});
@@ -43,6 +43,9 @@ export async function verifyRegressionJourneys({browser,origin,env,db}) {
     await page.unroute('**/api/account/profile');
     await page.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
     await page.getByText('Profil tersimpan.',{exact:true}).waitFor();
+    await page.getByText('Kelola sesi masuk',{exact:true}).click();
+    await page.getByRole('button',{name:'Muat sesi aktif',exact:true}).click();
+    await page.getByText(/^Sesi ini/).waitFor();
     await page.screenshot({path:'/tmp/madevi-qa-profile-tablet.png',animations:'disabled'});
     console.log('Lulus: password dengan spasi, kegagalan dan retry profil/privasi, simpan profil offline lalu pulih.');
   } finally {
@@ -65,6 +68,8 @@ export async function verifyRegressionJourneys({browser,origin,env,db}) {
     await page.locator('input[name="identity"]').fill('Madevi-Admin');
     await page.locator('input[name="password"]').fill(env.DEMO_PASSWORD);
     await page.getByRole('button',{name:'Masuk',exact:true}).click();
+    await page.locator('input[name="code"]').fill(currentTotp());
+    await page.getByRole('button',{name:'Verifikasi',exact:true}).click();
     await page.getByRole('heading',{name:'Dashboard',exact:true}).waitFor();
     for(const [label,panel,heading] of [['Pengguna','users','Pengguna'],['Ruang Madevi','content','Buat draf'],['Laporan & Dukungan','reports','Laporan Masalah'],['Notifikasi & Pesan','notifications','Notifikasi & Pesan'],['Database & Pemulihan','system','Database & Pemulihan']]) {
       await page.goto(`${origin}/admin/profile`);

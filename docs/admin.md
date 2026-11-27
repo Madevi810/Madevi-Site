@@ -19,6 +19,8 @@ Gunakan sidebar di desktop atau tombol **Menu admin** di ponsel. **Cari di panel
 | Pengaturan Website | Ubah pengumuman, bandingkan snapshot dan pulihkan sebagai versi baru. |
 | Keamanan & Audit | Lihat tindakan terkini dan peristiwa keamanan. Buka halaman keamanan admin untuk melihat status autentikator. |
 
+Pada **Keamanan Admin**, gunakan **Kelola sesi masuk** untuk meninjau dan mencabut sesi pribadi. Perubahan identitas dan kode pemulihan meminta MFA yang baru dibuktikan. Siapkan akses operator untuk penggantian faktor atau pemulihan tanpa kode. [Kebijakan dan pemulihan](keamanan.md#pemulihan-admin-tunggal)
+
 ## Terbitkan dan pulihkan konten
 
 1. Buka **Ruang Madevi**, lalu pilih ruang. Gunakan jenis yang telah disepakati untuk artikel teks, misalnya `article`. Gunakan slug seperti `panduan-contoh`, yaitu bagian alamat yang unik dalam ruang. Slug dipertahankan untuk menjaga alamat. Buat salinan dengan slug baru untuk menerbitkan versi berbeda.

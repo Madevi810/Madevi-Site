@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { databaseUrl } from "../src/lib/env.ts";
 import { createDatabasePool } from "../src/lib/postgres.ts";
 
 export function integerSetting(raw, fallback, min, max) {
@@ -28,7 +29,7 @@ export async function maintain(client,{mode,batch,limits,metrics,backupDays}) {
     const select=`SELECT ${columns} FROM ${table} WHERE ${age}<now()-make_interval(days=>$1)
       ORDER BY ${age},${columns} LIMIT $2`;
     const statement=mode==="prune"
-      ? `WITH b AS (${select} FOR UPDATE SKIP LOCKED), removed AS (DELETE FROM ${table} t USING b WHERE ${match}
+      ? `WITH b AS (${select}), removed AS (DELETE FROM ${table} t USING b WHERE ${match}
         AND t.${age}<now()-make_interval(days=>$1) RETURNING 1) SELECT count(*)::int AS count FROM removed`
       : `SELECT count(*)::int AS count FROM (${select}) AS b`;
     summary[label]=(await client.query(statement,[{limits,metrics}[policy],batch])).rows[0].count;
@@ -48,13 +49,25 @@ export async function maintain(client,{mode,batch,limits,metrics,backupDays}) {
   return summary;
 }
 
+export function maintenanceConnection(mode,env=process.env) {
+  const database=databaseUrl(env);
+  if(mode!=="prune")return database;
+  if(!env.MADEVI_MAINTENANCE_DATABASE_URL)throw Error("maintenance_role_required");
+  const dedicated=databaseUrl({...env,DATABASE_URL:env.MADEVI_MAINTENANCE_DATABASE_URL});
+  const base=new URL(database), other=new URL(dedicated);
+  if(base.host!==other.host||base.pathname!==other.pathname||!other.username||other.username===base.username) {
+    throw Error("maintenance_target_mismatch");
+  }
+  return dedicated;
+}
+
 async function main() {
   let pool,client;
   try {
     const settings=maintenanceSettings();
     if(process.argv.slice(2).includes("--dry-run"))settings.mode="dry-run";
     if(settings.mode==="off"){console.log(JSON.stringify({event:"ops.maintenance",mode:"off"}));return;}
-    pool=createDatabasePool(undefined,1);
+    pool=createDatabasePool(maintenanceConnection(settings.mode),1);
     client=await pool.connect();
     if(!(await client.query("SELECT pg_try_advisory_lock(7412315) AS locked")).rows[0].locked)return;
     const summary=await maintain(client,settings);

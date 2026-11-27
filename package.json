@@ -1,7 +1,7 @@
 {
   "name": "madevi-platform",
   "type": "module",
-  "version": "0.0.0-22",
+  "version": "0.0.0-23",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
@@ -24,7 +24,8 @@
     "jobs:operations": "node --env-file-if-exists=.env.local scripts/run-operations.mjs",
     "ops:prepare": "node --env-file-if-exists=.env.local scripts/host-profile.mjs",
     "ops:ready": "node --env-file-if-exists=.env.local scripts/operations-readiness.mjs",
-    "ops:maintenance": "node --env-file-if-exists=.env.local scripts/maintenance.mjs"
+    "ops:maintenance": "node --env-file-if-exists=.env.local scripts/maintenance.mjs",
+    "db:recover-owner": "node scripts/recover-owner.mjs"
   },
   "engines": {
     "node": ">=24.0.0"

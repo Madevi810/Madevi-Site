@@ -6,6 +6,8 @@ import { failure } from "@/lib/api";
 import { pool } from "@/lib/db";
 import { openBackup } from "@/lib/backup-artifact";
 
+let openDownloads=0;
+
 async function handleGET(_request:Request,{params}:{params:Promise<{id:string}>}) {
   const admin=await currentAdmin();
   if(!admin||!admin.row.madeviMfa||!admin.row.twoFactorEnabled||admin.row.isDemo)return failure("Diperlukan sesi admin dengan MFA.",403);
@@ -13,6 +15,9 @@ async function handleGET(_request:Request,{params}:{params:Promise<{id:string}>}
   if(!z.uuid().safeParse(id).success)return failure("Artefak tidak ditemukan.",404);
   const directory=process.env.MADEVI_BACKUP_DOWNLOAD_DIR;
   if(!directory)return failure("Direktori unduhan belum dihubungkan.",503);
+  if(openDownloads>=2)return failure("Kapasitas unduhan sedang penuh.",429,15);
+  openDownloads++;
+  let streaming=false;
   try {
     const result=await pool.query("SELECT artifact,bytes FROM madevi_operations WHERE id=$1 AND kind='backup' AND status='completed'",[id]);
     const item=result.rows[0];
@@ -24,11 +29,15 @@ async function handleGET(_request:Request,{params}:{params:Promise<{id:string}>}
     }
     try {await pool.query("INSERT INTO madevi_audit(actor_id,action,target_id) VALUES($1,'operations.download',$2)",[admin.row.id,id]);}
     catch(error){await handle.close();throw error;}
-    return new Response(Readable.toWeb(handle.createReadStream()) as ReadableStream<Uint8Array>,{headers:{
+    const stream=handle.createReadStream();
+    stream.once("close",()=>{openDownloads--;});
+    streaming=true;
+    return new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>,{headers:{
       "Content-Type":"application/octet-stream","Content-Disposition":`attachment; filename="${item.artifact}"`,
       "Content-Length":String(size),"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"
     }});
   } catch {return failure("Artefak tidak tersedia pada direktori unduhan.",503);}
+  finally {if(!streaming)openDownloads--;}
 }
 
 export const GET=apiRoute("/api/admin/operations/artifacts/[id]", "GET", handleGET);

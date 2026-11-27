@@ -1,3 +1,4 @@
+import { sessionUsable } from "@/lib/session-policy";
 import { apiRoute } from "@/lib/api-response";
 import { observeRoute } from "@/lib/monitoring";
 import { z } from "zod";
@@ -80,6 +81,11 @@ async function handlePOST(request:Request) {
 
     client=await pool.connect();await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(7412313)");
+    const active=await client.query(`SELECT 1 FROM "session" s JOIN "user" u ON u.id=s."userId"
+      WHERE s.id=$1 AND u.id=$2 AND u."madeviRole"='admin' AND u."twoFactorEnabled" AND s."madeviMfa"
+      AND NOT u.suspended AND NOT u."isDemo" AND ${sessionUsable} FOR UPDATE OF s`,
+      [admin.session.session.id,admin.row.id]);
+    if(!active.rowCount)throw new RequestError("Sesi admin telah berakhir. Masuk kembali.",403);
     const snapshot=(await client.query("SELECT capabilities FROM madevi_operations_health WHERE id=1 AND checked_at>now()-interval '10 minutes'")).rows[0];
     const cap=capabilitiesSchema.safeParse(snapshot?.capabilities);
     if(!cap.success)throw new RequestError("Worker belum melaporkan kesiapan.");
@@ -126,12 +132,13 @@ async function handlePOST(request:Request) {
       if(JSON.stringify([...(intended?.migrations??[])].sort())!==JSON.stringify(versions))throw new RequestError("Rilis tujuan tidak kompatibel dengan skema aktif.");
     }
     const parameters={target:input.target,artifactId:input.artifactId,checkId:input.checkId,revision:input.revision,
+      ...(["restore","release","host_config"].includes(input.kind)?{requestSession:admin.session.session.id}:{}),
       ...(input.kind==="release"||input.kind==="host_config"?{expectedActive:capabilities.host?.active}:{})};
     const collision=await client.query(`SELECT 1 FROM madevi_operations WHERE status IN ('queued','running') AND id<>$1
-      AND (kind=$2 AND parameters=$3::jsonb OR kind IN ('restore','release','host_config') AND $2 IN ('restore','release','host_config'))`,[input.id,input.kind,JSON.stringify(parameters)]);
+      AND (kind=$2 AND parameters-'requestSession'=($3::jsonb-'requestSession') OR kind IN ('restore','release','host_config') AND $2 IN ('restore','release','host_config'))`,[input.id,input.kind,JSON.stringify(parameters)]);
     if(collision.rowCount)throw new RequestError("Operasi sejenis atau perpindahan lain sedang menunggu atau berjalan.");
-    const inserted=await client.query(`INSERT INTO madevi_operations(id,kind,status,artifact,requested_by,parameters,retry_of,phase)
-      VALUES($1,$2,'queued',$3,$4,$5,$6,'queued') ON CONFLICT DO NOTHING RETURNING id`,[input.id,input.kind,artifact,admin.row.id,parameters,input.retryOf??null]);
+    const inserted=await client.query(`INSERT INTO madevi_operations(id,kind,artifact,requested_by,parameters,retry_of)
+      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING id`,[input.id,input.kind,artifact,admin.row.id,parameters,input.retryOf??null]);
     if(inserted.rowCount)await client.query("INSERT INTO madevi_audit(actor_id,action,target_id) VALUES($1,$2,$3)",[admin.row.id,`operations.request.${input.kind}`,input.id]);
     else {
       const duplicate=(await client.query("SELECT kind,parameters,retry_of FROM madevi_operations WHERE id=$1 AND requested_by=$2",[input.id,admin.row.id])).rows[0];

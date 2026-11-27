@@ -5,14 +5,15 @@ import { auth } from "./auth-config";
 import { pool } from "./db";
 import { isDemoAllowed } from "./config";
 import { isPrivileged } from "./auth-policy";
+import { sessionUsable } from "./session-policy";
 import { can, type Permission } from "./permissions";
 
 export async function currentAuthenticationAccount() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await auth.api.getSession({ headers: await headers(), query: { disableRefresh: true, disableCookieCache: true } });
   if (!session) return null;
   const result = await pool.query(
-    `SELECT u.id, u."madeviRole", (${accountRestricted}) AS suspended, u."isDemo", u."twoFactorEnabled", u.username, s."madeviMfa"
-     FROM "user" u JOIN "session" s ON s."userId" = u.id WHERE u.id = $1 AND s.id = $2`,
+    `SELECT u.id, u."madeviRole", (${accountRestricted}) AS suspended, u."isDemo", u."twoFactorEnabled", u.username, s."madeviMfa", s."createdAt">now()-interval '5 minutes' AS "recentMfa"
+     FROM "user" u JOIN "session" s ON s."userId" = u.id WHERE u.id = $1 AND s.id = $2 AND ${sessionUsable}`,
     [session.user.id, session.session.id],
   );
   const row = result.rows[0];
@@ -21,10 +22,9 @@ export async function currentAuthenticationAccount() {
 }
 
 export function hasAdministrativeMfa(row: {
-  madeviRole: string; twoFactorEnabled: boolean; madeviMfa: boolean; isDemo: boolean;
+  twoFactorEnabled: boolean; madeviMfa: boolean;
 }) {
-  return Boolean(row.twoFactorEnabled && row.madeviMfa) ||
-    (row.isDemo && row.madeviRole === "admin" && isDemoAllowed());
+  return Boolean(row.twoFactorEnabled && row.madeviMfa);
 }
 
 export async function currentAccount({ allowMfaEnrollment = false } = {}) {

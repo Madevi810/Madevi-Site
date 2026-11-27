@@ -14,7 +14,7 @@ async function handleGET(_request:Request,{params}:{params:Promise<{id:string}>}
     const admin=account?.row.madeviRole==="admin";
     const {rows}=await pool.query(`SELECT data,name,mime_type FROM madevi_library m WHERE id=$1 AND (
       $2::boolean OR
-      (m.visibility='public' AND EXISTS (
+      (m.visibility='public' AND (m.mime_type='image/webp' OR m.publication_reviewed_at IS NOT NULL) AND EXISTS (
         SELECT 1 FROM madevi_revision_files f JOIN madevi_content c ON c.id=f.content_id AND c.published_revision=f.revision
         WHERE f.media_id=m.id AND c.deleted_at IS NULL AND c.workflow_status<>'archived'
       )) OR EXISTS (

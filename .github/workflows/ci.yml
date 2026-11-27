@@ -8,7 +8,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:18
@@ -22,12 +22,19 @@ jobs:
           --health-cmd "pg_isready -U madevi_test -d madevi_ci_test"
           --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Inspect checkout for secret patterns
+        shell: bash
+        run: git ls-files -z | node scripts/check-repo-secrets.mjs
+      - name: Run maintained static security rules
+        run: pipx run --spec semgrep==1.155.0 semgrep --config .semgrep.yml --metrics=off --error src scripts
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck && npm test
       - run: npx playwright install --with-deps chromium
@@ -52,3 +59,18 @@ jobs:
           docker pull caddy:2.10-alpine
           node scripts/test-docker-rollback.mjs
       - run: npm audit --omit=dev --audit-level=high
+      - name: Build and check restricted runtime
+        run: |
+          docker build -t madevi-security-ci:local .
+          bash scripts/test-runtime-container.sh madevi-security-ci:local
+      - name: Inspect runtime image for fixable high and critical vulnerabilities
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/madevi-trivy"
+          trap 'rm -f "$RUNNER_TEMP/madevi-trivy/image.tar"' EXIT
+          docker save -o "$RUNNER_TEMP/madevi-trivy/image.tar" madevi-security-ci:local
+          docker run --rm \
+            --mount "type=bind,src=$RUNNER_TEMP/madevi-trivy/image.tar,dst=/scan/image.tar,readonly" \
+            aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c image \
+            --db-repository ghcr.io/aquasecurity/trivy-db:2 --db-repository public.ecr.aws/aquasecurity/trivy-db:2 \
+            --input /scan/image.tar --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress --table-mode detailed

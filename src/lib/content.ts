@@ -59,7 +59,7 @@ export async function transitionContent(actor:Actor,id:string,input:z.infer<type
 async function attach(client:PoolClient,id:string, revision:number, ids?:string[]) {
   const mediaIds = [...new Set(ids || [])];
   if (!mediaIds.length) return;
-  const media = await client.query("SELECT id FROM madevi_library WHERE id=ANY($1::uuid[]) AND visibility='public' FOR KEY SHARE",[mediaIds]);
+  const media = await client.query("SELECT id FROM madevi_library WHERE id=ANY($1::uuid[]) AND visibility='public' AND (mime_type='image/webp' OR publication_reviewed_at IS NOT NULL) FOR KEY SHARE",[mediaIds]);
   if (media.rowCount !== mediaIds.length) throw new ContentError(400,"Lampiran publik tidak ditemukan");
   await client.query("INSERT INTO madevi_revision_files(content_id,revision,media_id) SELECT $1,$2,unnest($3::uuid[])",[id,revision,mediaIds]);
 }
@@ -68,7 +68,7 @@ export async function readPublishedContent(space:string, slug:string) {
   const {rows} = await pool.query(`SELECT c.space,c.content_type AS type,c.slug,r.title,r.body,r.metadata,c.updated_at,
     (SELECT coalesce(json_agg(json_build_object('id',m.id,'name',m.name) ORDER BY m.name,m.id),'[]'::json)
      FROM madevi_revision_files f JOIN madevi_library m ON m.id=f.media_id
-     WHERE f.content_id=c.id AND f.revision=c.published_revision AND m.visibility='public') AS files
+     WHERE f.content_id=c.id AND f.revision=c.published_revision AND m.visibility='public' AND (m.mime_type='image/webp' OR m.publication_reviewed_at IS NOT NULL)) AS files
     FROM madevi_content c JOIN madevi_content_revisions r ON r.content_id=c.id AND r.revision=c.published_revision
     WHERE c.space=$1 AND c.slug=$2 AND c.deleted_at IS NULL AND c.workflow_status<>'archived'`,[space,slug]);
   const item = rows[0];

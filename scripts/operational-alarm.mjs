@@ -17,6 +17,8 @@ export const signalLabels={
   backupCapacity:"Ruang kosong volume backup",
 };
 
+const smtpRetryMs=15*60000;
+
 export async function updateAlarms(previous,samples,now,settings,notify,checkpoint=async()=>{}) {
   const result=structuredClone(previous);
   for(const kind of Object.keys(signalLabels)) {
@@ -24,39 +26,59 @@ export async function updateAlarms(previous,samples,now,settings,notify,checkpoi
     if(typeof sample!=="boolean")continue;
     const state=result[kind]??{failures:0,active:false,notified:false,repeats:0,attemptAt:0,sentAt:0,deliveryAttempts:0,recoveryAttempts:0};
     result[kind]=state;
+    // Upgrade pre-existing state conservatively. A checkpoint before an SMTP result is ambiguous.
+    state.outcome??=state.attemptAt>state.sentAt?"uncertain":state.notified?"accepted":"none";
+    state.lastEvent??=state.recoveryAttempts?"recovered":state.notified?"repeat":"opened";
+    state.retryAt??=state.outcome==="uncertain"?state.attemptAt+smtpRetryMs:0;
     if(sample) {
       state.failures=0;
-      if(!state.active){delete result[kind];continue;}
-      // SMTP failure may mean acceptance was ambiguous. Retry no sooner than 15 minutes.
-      if(state.notified||state.attemptAt) {
-        if(state.recoveryAttempts>=3||now-state.attemptAt<15*60000)continue;
-        state.recoveryAttempts++;
-        state.attemptAt=now;
+      const needsRecovery=state.active&&(state.notified||state.outcome==="uncertain");
+      if(!needsRecovery) {
+        delete result[kind];
         await checkpoint(result);
-        try {await notify(kind,"recovered");}catch {state.deliveryFailed=true;continue;}
+        continue;
       }
-      delete result[kind];
+      // Only a recovery retry or an initial message with ambiguous acceptance waits.
+      const wait=state.lastEvent==="recovered"||!state.notified;
+      if(state.recoveryAttempts>=3||wait&&now<state.retryAt)continue;
+      state.recoveryAttempts++;
+      await deliver("recovered");
+      if(state.outcome==="accepted")delete result[kind];
       await checkpoint(result);
       continue;
     }
-    state.recoveryAttempts=0;
     state.failures=Math.min(state.failures+1,settings.failures);
     if(state.failures<settings.failures&&!state.active)continue;
     state.active=true;
     if(state.notified&&(state.repeats>=settings.maxRepeats||now-state.sentAt<settings.repeatMs))continue;
-    if(state.deliveryAttempts>=3||state.attemptAt&&now-state.attemptAt<15*60000)continue;
+    if(state.deliveryAttempts>=3||now<state.retryAt)continue;
     state.deliveryAttempts++;
-    state.attemptAt=now;
-    await checkpoint(result);
-    try {
-      await notify(kind,state.notified?"repeat":"opened");
+    await deliver(state.notified?"repeat":"opened");
+    if(state.outcome==="accepted") {
       if(state.notified)state.repeats++;
-      state.notified=true;state.sentAt=now;state.deliveryFailed=false;state.deliveryAttempts=0;
-    } catch {state.deliveryFailed=true;}
+      state.notified=true;state.sentAt=now;state.deliveryAttempts=0;
+    }
     await checkpoint(result);
+
+    async function deliver(event) {
+      state.lastEvent=event;
+      state.attemptAt=now;
+      state.retryAt=now+smtpRetryMs;
+      state.outcome="uncertain";
+      await checkpoint(result);
+      try {
+        await notify(kind,event);
+        state.outcome="accepted";
+        state.retryAt=0;
+      } catch(error) {
+        state.outcome=error instanceof UncertainDelivery?"uncertain":"failed";
+      }
+    }
   }
   return result;
 }
+
+export class UncertainDelivery extends Error {}
 
 async function observations() {
   const collectDatabase=async()=>{
@@ -95,7 +117,9 @@ async function readState(path) {
     for(const [key,item] of Object.entries(data)) {
       if(!Object.hasOwn(signalLabels,key)||!item||
         !["failures","repeats","attemptAt","sentAt","deliveryAttempts","recoveryAttempts"].every(field=>Number.isSafeInteger(item[field])&&item[field]>=0)||
-        typeof item.active!=="boolean"||typeof item.notified!=="boolean")throw Error("invalid_alarm_state");
+        typeof item.active!=="boolean"||typeof item.notified!=="boolean"||
+        item.outcome!==undefined&&(!["none","accepted","failed","uncertain"].includes(item.outcome)||
+          !["opened","repeat","recovered"].includes(item.lastEvent)||!Number.isSafeInteger(item.retryAt)||item.retryAt<0))throw Error("invalid_alarm_state");
     }
     return data;
   } finally {await file.close();}
@@ -118,6 +142,10 @@ export async function smtpAlarm(settings,kind,event) {
       text:`${signalLabels[kind]}\n${labels[event]} pada ${new Date().toISOString()}. Periksa panduan operasi dan journal worker.`,
     });
     if(!result.accepted?.length)throw Error("delivery_unconfirmed");
+  } catch(error) {
+    // An SMTP rejection is explicit. A lost connection can leave acceptance unknown.
+    if(error?.responseCode>=400&&error?.responseCode<=599)throw Error("smtp_rejected");
+    throw new UncertainDelivery("smtp_acceptance_unknown");
   } finally {transport.close();}
 }
 
@@ -135,7 +163,7 @@ async function main() {
       console.log(JSON.stringify({event:"ops.alarm",signal:kind,outcome:event}));
     },current=>persist(filename,current));
     await persist(filename,state);
-    if(Object.values(state).some(item=>item.deliveryFailed)) {
+    if(Object.values(state).some(item=>item.outcome==="failed"||item.outcome==="uncertain")) {
       console.error(JSON.stringify({event:"ops.alarm",outcome:"delivery_failed"}));
       process.exitCode=1;
     }

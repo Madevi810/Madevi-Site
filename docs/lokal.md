@@ -49,7 +49,7 @@ Buka `http://127.0.0.1:3000`. Coba halaman beranda dan satu ruang. Buka `http://
 
 ## 3. Coba akun dan admin
 
-Langkah ini opsional. Di `.env.local`, isi `MADEVI_DEMO_MODE=true` dan buat `DEMO_PASSWORD` sintetis minimal 10 karakter. Database dan origin harus tetap loopback, tanpa proxy tepercaya. Jalankan `npm run db:seed-demo` dan restart `npm run dev`. Buka sidebar → Profil → Masuk dengan `Madevi-User`. Untuk admin, buka `/admin` dan masuk dengan `Madevi-Admin`. Gunakan password demo lokal pada keduanya. Pengecualian MFA untuk admin demo hanya berlaku pada kondisi dev lokal yang diperiksa aplikasi. Setelah mencoba, matikan flag dan restart bila ingin kembali memakai mode biasa. [Batas dan penutupan demo](../ops/demo-terbatas.md)
+Langkah ini opsional. Di `.env.local`, isi `MADEVI_DEMO_MODE=true` dan buat `DEMO_PASSWORD` sintetis minimal 10 karakter. Database dan origin harus tetap loopback, tanpa proxy tepercaya. Jalankan `npm run db:seed-demo` dan restart `npm run dev`. Buka sidebar → Profil → Masuk dengan `Madevi-User`. Untuk admin, buka `/admin` dan masuk dengan `Madevi-Admin`. Gunakan password demo lokal pada keduanya. Admin demo tetap perlu mendaftarkan autentikator TOTP dan membuktikan MFA sebelum membuka panel. Setelah mencoba, matikan flag dan restart bila ingin kembali memakai mode biasa. [Batas dan penutupan demo](../ops/demo-terbatas.md)
 
 Untuk melihat cara admin non-demo diinisialisasi, gunakan [bootstrap dan MFA](online.md#5-buat-admin-dan-uji-alur). Skrip pemilik menolak pembuatan jika sudah ada admin pada database itu. Gunakan database uji kosong terpisah bila ingin mencoba jalur non-demo.
 

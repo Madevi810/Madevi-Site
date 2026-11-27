@@ -1,3 +1,4 @@
+import { withUploadCapacity } from "@/lib/upload-capacity";
 import { apiRoute } from "@/lib/api-response";
 import { observeRoute } from "@/lib/monitoring";
 import { createHash } from "node:crypto";
@@ -62,4 +63,4 @@ async function handlePOST(request:Request){
  }
 }
 
-export const POST=observeRoute("report.write",apiRoute("/api/report", "POST",handlePOST));
+export const POST=observeRoute("report.write",apiRoute("/api/report", "POST",(request:Request)=>request.headers.get("content-type")?.startsWith("multipart/form-data")?withUploadCapacity(()=>handlePOST(request)):handlePOST(request)));

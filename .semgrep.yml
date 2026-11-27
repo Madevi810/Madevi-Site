@@ -1,0 +1,31 @@
+rules:
+  - id: madevi-shell-escape
+    message: Gunakan argumen terstruktur dan pertahankan operasi host tanpa shell.
+    severity: ERROR
+    languages: [javascript, typescript]
+    paths:
+      include: [/src/, /scripts/run-operations.mjs, /scripts/host-profile.mjs, /scripts/scheduled-operation.mjs]
+    pattern-either:
+      - pattern: "$PROC.spawn(..., { ..., shell: true, ... })"
+      - pattern: "spawn(..., { ..., shell: true, ... })"
+      - pattern: import { ..., exec, ... } from "node:child_process"
+  - id: madevi-no-public-secret
+    message: Rahasia server harus diakses di server.
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern-regex: 'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|PASSWORD|TOKEN|PRIVATE_KEY|DATABASE_URL)'
+  - id: madevi-sql-input
+    message: Gunakan parameter SQL untuk nilai dari permintaan.
+    severity: ERROR
+    languages: [typescript]
+    paths:
+      include: [/src/app/api/]
+    mode: taint
+    pattern-sources:
+      - pattern: await bodyJson(...)
+      - pattern: await $REQUEST.json()
+      - pattern: new URL(...).searchParams.get(...)
+    pattern-sinks:
+      - patterns:
+          - pattern: $DB.query($SQL, ...)
+          - focus-metavariable: $SQL

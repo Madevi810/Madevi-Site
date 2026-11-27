@@ -16,7 +16,7 @@ export async function consumeRateLimit(key: string, limit: number, windowSeconds
   return Number(result.rows[0].hits) <= limit;
 }
 
-type Group = "api" | "login" | "recovery" | "mfa" | "registration" | "report" | "oauth";
+type Group = "api" | "login" | "recovery" | "mfa" | "registration" | "report" | "oauth" | "upload" | "backup-download" | "operations";
 
 function operation(path: string): Group {
   if (path === "/api/register") return "registration";
@@ -36,6 +36,9 @@ const limits: Record<Group, { ip: number; browser: number; anonymous: number }> 
   registration: { ip: 18, browser: 6, anonymous: 15 },
   report: { ip: 30, browser: 12, anonymous: 30 },
   oauth: { ip: 40, browser: 20, anonymous: 30 },
+  upload: { ip: 24, browser: 12, anonymous: 12 },
+  "backup-download": { ip: 8, browser: 4, anonymous: 4 },
+  operations: { ip: 20, browser: 12, anonymous: 12 },
 };
 
 async function knownTarget(request: Request, path: string): Promise<string | undefined> {
@@ -55,11 +58,17 @@ async function knownTarget(request: Request, path: string): Promise<string | und
 }
 
 export async function allowApiRequest(request: Request, path: string, cookie?: string, userId?: string): Promise<boolean> {
-  const group = operation(path);
+  const group = path.startsWith("/api/admin/operations/artifacts/") ? "backup-download"
+    : path==="/api/admin/operations"&&request.method==="POST" ? "operations"
+    : (path==="/api/account/avatar"||path==="/api/admin/media")&&request.method==="POST" ? "upload"
+    : operation(path);
   const source = requestRateIdentity(request.headers, cookie);
   const accountKey = userId && `account:${rateHash(userId)}`;
   const policy = limits[group];
   if (group === "api" && accountKey) return consumeRateLimit(`api:${accountKey}`, 240);
+  if(accountKey&&(group==="upload"||group==="backup-download"||group==="operations")) {
+    return consumeRateLimit(`${group}:${accountKey}`,policy.browser);
+  }
 
   if (!await consumeRateLimit(`${group}:${source.key}`, policy[source.kind])) return false;
   // Unverified clients can discard a browser cookie. Keep a bounded emergency

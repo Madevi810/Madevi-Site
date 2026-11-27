@@ -11,7 +11,7 @@ Ikuti urutan ini untuk staging dengan data sintetis, lalu ulangi dengan konfigur
 ## 2. Ambil nilai dan pisahkan role
 
 1. Buat database khusus Madevi serta role login migrasi dan runtime. Simpan nama host, port, database, role/password dan CA dari penyedia. Pastikan aturan jaringan mengizinkan server dan mesin yang akan menjalankan migrasi. Gunakan URI seperti `postgresql://ROLE:PASSWORD_ENCODED@HOST:PORT/DB?sslmode=verify-full`. Gunakan `sslrootcert` bila penyedia meminta CA terpisah. Dalam container path CA harus dapat dibaca user non-root.
-2. Dari root repo, gunakan [contoh role SQL](../database/roles.example.sql) dengan operator database yang berhak. Kedua role dibuat terlebih dahulu. Pada database baru, jalankan contoh sebelum migrasi dan ulangi sesudahnya supaya role runtime hanya bisa membaca tabel riwayat migrasi. Jika database lama sudah berisi tabel milik role lain, periksa dan alihkan kepemilikan objek kepada role migrasi secara terkontrol.
+2. Dari root repo, gunakan [contoh role SQL](../database/roles.example.sql) dengan operator database yang berhak. Buat role migrasi dan runtime lebih dahulu. Siapkan role operasi dan backup jika pekerjaan host dipakai, serta role pemeliharaan jika mode prune direncanakan. Pada database baru, jalankan contoh sebelum migrasi dan ulangi sesudahnya agar role runtime mendapat hak yang diperlukan dan hanya dapat membaca riwayat migrasi. Jika database lama sudah berisi tabel milik role lain, periksa dan alihkan kepemilikan objek kepada role migrasi secara terkontrol.
 3. Tentukan origin persis, misalnya `https://staging.example.invalid`. Arahkan DNS ke proxy ketika layanan siap. Generate secret menggunakan `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` dalam terminal privat. Pakai nilai berbeda untuk `BETTER_AUTH_SECRET` dan `MADEVI_PROXY_SECRET`. Simpan dalam pengelola secret.
 
 Contoh role dijalankan dari terminal dengan koneksi operator yang telah disiapkan secara privat. `PGHOST`, `PGPORT`, `PGUSER`, metode password dan CA berasal dari pengaturan PostgreSQL, sedangkan `PGDATABASE` harus menunjuk database khusus Madevi.
@@ -44,16 +44,16 @@ Jalankan dari root. Untuk lingkungan staging, tambahkan opsi project dan overrid
 ```bash
 docker compose build madevi
 # Muat DATABASE_URL role migrasi di shell privat hanya untuk perintah ini.
-docker compose run --rm -e DATABASE_URL madevi npm run db:migrate
+docker compose run --rm -e DATABASE_URL madevi node scripts/migrate.mjs
 # Terapkan ulang contoh role SQL dari mesin operator.
-docker compose run --rm madevi npm run check:ready
+docker compose run --rm madevi node scripts/check-ready.mjs
 # Muat OWNER_USERNAME, OWNER_EMAIL, OWNER_PASSWORD privat untuk bootstrap satu kali.
-docker compose run --rm -e OWNER_USERNAME -e OWNER_EMAIL -e OWNER_PASSWORD madevi npm run db:create-owner
+docker compose run --rm -e DATABASE_URL -e OWNER_USERNAME -e OWNER_EMAIL -e OWNER_PASSWORD madevi node scripts/create-owner.mjs
 ```
 
 Pada instalasi Node langsung, perintah ekuivalen adalah `npm run db:migrate`, `npm run check:ready` dan `npm run db:create-owner` dengan environment yang benar. Perintah npm lokal membaca `.env.local` bila tersedia. Untuk file privat server tersendiri, pakai `node --env-file=/lokasi-privat/madevi.env scripts/check-ready.mjs`.
 
-Migrasi menampilkan `Migrasi selesai.` jika skema telah dicatat. `check:ready` menampilkan tujuan host/database tanpa password, status skema, dan status integrasi opsional. Exit 1 berarti ada pengaturan atau probe yang gagal. SMTP kosong dilaporkan belum aktif. SMTP yang terisi diperiksa koneksi/autentikasinya tanpa mengirim email. Google terisi hanya menunjukkan konfigurasi ada. Verifikasi header dan akses origin tetap perlu dilakukan dari jaringan tujuan.
+Migrasi menampilkan `Migrasi selesai.` jika skema telah dicatat. `check:ready` menampilkan tujuan host/database tanpa password, status skema, batas hak role web, dan status integrasi opsional. Exit 1 berarti ada pengaturan atau probe yang gagal. SMTP kosong dilaporkan belum aktif. SMTP yang terisi diperiksa koneksi/autentikasinya tanpa mengirim email. Google terisi hanya menunjukkan konfigurasi ada. Verifikasi header dan akses origin tetap perlu dilakukan dari jaringan tujuan.
 
 ## 5. Jalankan staging, uji fitur, dan putuskan promosi
 
@@ -67,6 +67,8 @@ Migrasi menampilkan `Migrasi selesai.` jika skema telah dicatat. `check:ready` m
 1. Siapkan akun proses, Node 24, klien PostgreSQL, database runtime dan direktori privat pada host Compose. Buat environment worker dari contoh. Siapkan timer systemd untuk pesan, operasi dan pemeliharaan sesuai panduan. Biarkan backup rutin dan alarm kosong sampai interval, kunci dan penerima disetujui. [Persiapan dan pemasangan timer](../ops/systemd/README.md)
 2. Dari root jalankan `npm run ops:ready` dengan environment host. Periksa kelompok konfigurasi, database, akses backup, mount, katalog dan laporan worker. Cocokkan hasil dengan `systemctl list-timers 'madevi-*'` dan journal karena pemeriksaan aplikasi hanya membuktikan laporan yang sudah diterima.
 3. Pada staging, jadwalkan pesan untuk satu akun sintetis satu menit ke depan dan periksa status serta inbox penerima. Ajukan backup dari panel, verifikasi, unduh bila diaktifkan, dan uji restore ke database terpisah. Jalankan retensi dalam mode `dry-run`, simpan salinan backup pada lokasi lain, lalu uji alarm dengan SMTP uji. [Alur admin](operasi-admin.md) dan [pemeriksaan operasi](operasional.md)
+
+Gunakan role pemilik skema untuk migrasi dan bootstrap. Terapkan ulang hak eksplisit setelah migrasi, jalankan pemeriksaan memakai role runtime, dan siapkan file host privat sesuai kebutuhan operasi. Simpan akses untuk pemulihan admin secara terpisah. [Keamanan dan inventaris rahasia](keamanan.md)
 
 ## 7. Kenali kegagalan dan pulihkan
 

@@ -2,6 +2,8 @@
 
 Siapkan satu penanggung jawab, akses terbatas ke dashboard, catatan versi aplikasi, dan tempat aman untuk backup. Kerjakan latihan di staging sebelum produksi. Kode sudah memiliki probe, log terstruktur, dan [monitoring internal](operasi-admin.md#baca-monitoring). Siapkan timer host, akses kunci dan target terpisah setelah lingkungan tersedia. Kanal alarm SMTP dapat dijalankan di host yang sama. Pemantauan dari luar host bersifat opsional agar gangguan mesin host tetap dapat terdeteksi.
 
+Simpan inventaris peran, kredensial, dan generasi kunci backup di luar checkout. Uji pemulihan admin tunggal dan rotasi rahasia di staging. [Panduan keamanan](keamanan.md)
+
 ## Pemeriksaan rutin
 
 - Probe dan alarm host mengecek `/api/health/live` (proses menjawab) dan `/api/health/ready` (koneksi database dan migrasi tersedia). Tentukan interval, batas kegagalan berturut-turut, penerima alarm, dan petugas yang merespons. Uji alarm dan pulihnya secara terkendali pada staging.

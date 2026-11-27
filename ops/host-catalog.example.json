@@ -5,7 +5,7 @@
     {
       "id": "current",
       "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-      "migrations": ["001_foundation", "002_notifications", "003_activation_security", "004_admin_foundation", "005_admin_operations", "006_operational_reliability"]
+      "migrations": ["001_foundation", "002_notifications", "003_activation_security", "004_admin_foundation", "005_admin_operations", "006_operational_reliability", "007_account_security"]
     },
     {
       "id": "previous",

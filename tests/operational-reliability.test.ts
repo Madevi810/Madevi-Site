@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { apiRoute } from "../src/lib/api-response.ts";
 // @ts-expect-error JavaScript host executors are tested directly.
-import { updateAlarms } from "../scripts/operational-alarm.mjs";
+import { UncertainDelivery, updateAlarms } from "../scripts/operational-alarm.mjs";
 // @ts-expect-error JavaScript host executors are tested directly.
 import { alertSettings } from "../scripts/alarm-settings.mjs";
 
@@ -52,7 +52,7 @@ test("SMTP failure stays visible and its retry observes the cooldown",async()=>{
   const fail=async()=>{attempts++;throw Error("fixture transport refused");};
   let state=await updateAlarms({}, {dispatch:false},since,settings,fail);
   state=await updateAlarms(state, {dispatch:false},since+60000,settings,fail,async()=>{checkpoints++;});
-  assert.equal(state.dispatch.deliveryFailed,true);
+  assert.equal(state.dispatch.outcome,"failed");
   assert.equal(state.dispatch.notified,false);
   assert.equal(checkpoints,2);
   state=await updateAlarms(state, {dispatch:false},since+120000,settings,fail);
@@ -60,7 +60,7 @@ test("SMTP failure stays visible and its retry observes the cooldown",async()=>{
   state=await updateAlarms(state, {dispatch:false},since+1200000,settings,async()=>{attempts++;});
   assert.equal(attempts,2);
   assert.equal(state.dispatch.notified,true);
-  assert.equal(state.dispatch.deliveryFailed,false);
+  assert.equal(state.dispatch.outcome,"accepted");
   assert.equal(alertSettings({}),null);
   assert.throws(()=>alertSettings({MADEVI_ALERT_TO:"ops@example.invalid"}),/invalid_alert_channel/);
 });
@@ -75,4 +75,44 @@ test("SMTP failures stop after three attempts for one stage",async()=>{
     throw Error("fixture transport refused");
   });
   assert.equal(attempts,3);
+});
+
+test("recovery is sent on the next healthy probe after an accepted alarm and survives restart",async()=>{
+  const first=1700000000000, minute=60000;
+  const settings={failures:2,repeatMs:3600000,maxRepeats:0};
+  const events:string[]=[];
+  const notify=async(_kind:string,event:string)=>{events.push(event);};
+  let persisted="{}";
+  const checkpoint=async(state:unknown)=>{persisted=JSON.stringify(state);};
+  let state=await updateAlarms({}, {readiness:false},first,settings,notify,checkpoint);
+  state=await updateAlarms(state, {readiness:false},first+minute,settings,notify,checkpoint);
+  state=await updateAlarms(JSON.parse(persisted), {},first+minute,settings,notify,checkpoint);
+  assert.deepEqual(events,["opened"]);
+  state=await updateAlarms(state, {readiness:true},first+2*minute,settings,notify,checkpoint);
+  assert.deepEqual(events,["opened","recovered"]);
+  state=await updateAlarms(JSON.parse(persisted), {readiness:true},first+3*minute,settings,notify,checkpoint);
+  state=await updateAlarms(state, {readiness:false},first+4*minute,settings,notify,checkpoint);
+  await updateAlarms(state, {readiness:false},first+5*minute,settings,notify,checkpoint);
+  assert.deepEqual(events,["opened","recovered","opened"]);
+});
+
+
+test("an interrupted SMTP attempt keeps its retry deadline after restart",async()=>{
+  const first=1700000000000, minute=60000;
+  const settings={failures:2,repeatMs:3600000,maxRepeats:0};
+  const events:string[]=[];
+  let persisted="{}";
+  const checkpoint=async(state:unknown)=>{persisted=JSON.stringify(state);};
+  const notify=async(_kind:string,event:string)=>{
+    events.push(event);
+    if(event==="opened")throw new UncertainDelivery();
+  };
+  let state=await updateAlarms({}, {readiness:false},first,settings,notify,checkpoint);
+  state=await updateAlarms(state, {readiness:false},first+minute,settings,notify,checkpoint);
+  assert.equal(state.readiness.outcome,"uncertain");
+  state=await updateAlarms(JSON.parse(persisted), {readiness:true},first+2*minute,settings,notify,checkpoint);
+  assert.deepEqual(events,["opened"]);
+  state=await updateAlarms(state, {readiness:true},first+16*minute,settings,notify,checkpoint);
+  assert.deepEqual(events,["opened","recovered"]);
+  assert.deepEqual(state,{});
 });

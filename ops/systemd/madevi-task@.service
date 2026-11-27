@@ -10,6 +10,7 @@ User=madevi-ops
 Group=madevi-ops
 WorkingDirectory=/srv/madevi
 EnvironmentFile=/etc/madevi/operations.env
+EnvironmentFile=-/etc/madevi/%i-db.env
 ExecStart=/usr/bin/node /srv/madevi/scripts/scheduled-operation.mjs %i
 UMask=0077
 TimeoutStartSec=20min

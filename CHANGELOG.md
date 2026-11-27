@@ -2,6 +2,12 @@
 
 Nomor rilis Madevi terdiri dari empat bagian. Angka terakhir naik satu tingkat pada tiap rilis sesuai keputusan proyek. Manifest npm memakai representasi valid seperti `0.0.0-19`. Pilihan pembaruan utama di README mengikuti dampak, tanpa semantik tambahan pada angka versi.
 
+## v0.0.0.23 — penguatan keamanan, kesiapan dan pemulihan
+
+- Kirim alarm pulih pada pemeriksaan sehat berikutnya setelah SMTP menerima alarm gangguan. Pertahankan jeda untuk percobaan ulang dan penerimaan yang belum pasti.
+- Tegakkan MFA admin, masa berlaku sesi, konfirmasi perubahan identitas, dan pemulihan pemilik melalui host. Tambahkan hak database yang terpisah dan audit hasil operasi.
+- Catat tinjauan publikasi dokumen. Batasi unggahan, unduhan backup, dan runtime container. Perbarui paket PAM dan keluarkan package manager dari image runtime. Tambahkan pemeriksaan pola secret serta analisis kode dan image pada CI.
+
 ## v0.0.0.22 — penguatan API, dukungan dan operasi host
 
 - Tambahkan kontrak error dan ID korelasi pada API Madevi. Pertahankan bentuk respons Better Auth dan probe.

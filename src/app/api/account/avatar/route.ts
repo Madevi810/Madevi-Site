@@ -1,3 +1,4 @@
+import { withUploadCapacity } from "@/lib/upload-capacity";
 import { apiRoute } from "@/lib/api-response";
 import { NextResponse } from "next/server";
 import { currentAccount } from "@/lib/access";
@@ -17,5 +18,5 @@ async function handlePOST(request:Request){
 async function handleDELETE(request:Request){const account=await currentAccount();if(!account)return NextResponse.json({error:"Tidak diizinkan"},{status:401});if(!sameOrigin(request))return NextResponse.json({error:"Permintaan tidak valid"},{status:403});const {pool}=await import('@/lib/db');const client=await pool.connect();try{await client.query('BEGIN');await client.query('DELETE FROM madevi_media_variants WHERE user_id=$1',[account.row.id]);await client.query('DELETE FROM madevi_avatars WHERE user_id=$1',[account.row.id]);await client.query('INSERT INTO madevi_audit(actor_id,action,target_id) VALUES($1,$2,$3)',[account.row.id,'account.avatar.delete',account.row.id]);await client.query('COMMIT');return NextResponse.json({ok:true})}catch{await client.query('ROLLBACK');return NextResponse.json({error:'Foto belum dapat dihapus.'},{status:503})}finally{client.release()}}
 
 export const GET=apiRoute("/api/account/avatar", "GET", handleGET);
-export const POST=apiRoute("/api/account/avatar", "POST", handlePOST);
+export const POST=apiRoute("/api/account/avatar", "POST", (request:Request)=>withUploadCapacity(()=>handlePOST(request)));
 export const DELETE=apiRoute("/api/account/avatar", "DELETE", handleDELETE);

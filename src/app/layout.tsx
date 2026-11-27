@@ -1,3 +1,4 @@
+import { SessionActivity } from "@/components/session-activity";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
@@ -7,6 +8,6 @@ export const metadata: Metadata = { title: "MADEVI", description: "Ruang untuk b
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const nonce=(await headers()).get("x-nonce")||undefined;
   const themeScript='try{document.documentElement.dataset.theme=localStorage.getItem("madevi-theme")==="dark"?"dark":"light"}catch{}';
-  return <html lang="id" suppressHydrationWarning><head><script nonce={nonce} dangerouslySetInnerHTML={{__html:themeScript}}/></head><body>{children}</body></html>;
+  return <html lang="id" suppressHydrationWarning><head><script nonce={nonce} dangerouslySetInnerHTML={{__html:themeScript}}/></head><body><SessionActivity/>{children}</body></html>;
 }
 

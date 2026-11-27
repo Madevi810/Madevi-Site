@@ -188,6 +188,9 @@ export async function verifyAdminFoundation({origin,adminCookie,userCookie,other
   const pdfForm=new FormData();
   pdfForm.set("name","Dokumen PDF uji");pdfForm.set("visibility","public");
   pdfForm.set("file",new File([pdf],"dokumen.pdf",{type:"application/pdf"}));
+  await send("/api/admin/media",pdfForm,"POST",400);
+  assert.equal((await request("/api/admin/media",{cookie:userCookie,method:"PATCH",data:{id:randomUUID(),publicationChecked:true}})).status,403);
+  pdfForm.set("publicationChecked","on");
   const uploadedPdf=await send("/api/admin/media",pdfForm,"POST",201);
   const pdfPath=`/api/media/${uploadedPdf.id}`;
   assert.equal((await request(pdfPath,{cookie:""})).status,404);

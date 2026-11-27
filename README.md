@@ -20,7 +20,7 @@ Pendaftaran, verifikasi, perubahan email, dan pemulihan kata sandi memerlukan SM
 
 ## Cuplikan aplikasi lokal
 
-Cuplikan diambil dari Madevi V0.0.0.22 yang dijalankan secara lokal dengan data PostgreSQL sintetis. Profil memakai akun demo. Admin memakai akun uji yang menyelesaikan MFA. [Cara mengambil ulang galeri](docs/screenshot.md)
+Cuplikan diambil dari Madevi V0.0.0.23 yang dijalankan secara lokal dengan data PostgreSQL sintetis. Profil memakai akun demo. Admin memakai akun uji yang menyelesaikan MFA. [Cara mengambil ulang galeri](docs/screenshot.md)
 
 <table>
   <tr>
@@ -81,14 +81,17 @@ Aplikasi memakai Node.js 24, Next.js App Router, React, TypeScript, PostgreSQL m
 
 Untuk langkah lengkap dan solusi masalah setup, lihat [panduan lokal](docs/lokal.md). Mulai dari [indeks dokumentasi](docs/README.md), lalu baca [fondasi proyek](docs/fundamental.md), [persiapan online](docs/online.md) atau [laporan verifikasi penataan](docs/laporan-penataan.md).
 
+Untuk kebijakan akses, sesi, pemulihan admin dan pengelolaan rahasia, baca [panduan keamanan](docs/keamanan.md).
+
 Untuk integrasi default dan pengoperasian, baca [aktivasi default](docs/aktivasi-default.md), [API Madevi](docs/api.md), dan [jadwal operasi host](ops/systemd/README.md).
 
-## Madevi V0.0.0.22 — Update terbaru
+## Madevi V0.0.0.23 — Update terbaru
 
-API Madevi memberi kode kesalahan yang konsisten dan mendukung percobaan ulang tanpa menggandakan tindakan. Percakapan dukungan menampilkan pesan sesuai urutan. Host mendapat pemeriksaan kesiapan, jadwal backup, retensi bertahap, serta alarm SMTP opsional. [Bukti verifikasi](docs/laporan-operasi.md)
+Madevi memperketat MFA, masa berlaku sesi, hak database, dan audit. Alarm pulih dikirim pada pemeriksaan sehat berikutnya. Image runtime memakai paket PAM yang diperbarui dan menjalankan aplikasi langsung melalui Node. [Bukti verifikasi](docs/laporan-keamanan.md)
 
 Pembaruan utama (major) berikut dipilih berdasarkan dampaknya pada fondasi dan alur pengguna. Kategori ini untuk penyajian riwayat. Nomor versi Madevi tetap memakai empat bagian dan angka terakhir bertambah satu tiap rilis.
 
+- **V0.0.0.23** — Penguatan sesi dan MFA, hak database, alarm pulih, serta keamanan image runtime.
 - **V0.0.0.22** — Ketahanan API, urutan percakapan, pemeriksaan host, backup rutin, retensi, dan alarm.
 - **V0.0.0.21** — Operasi host dari panel admin, riwayat pengaturan, lampiran dokumen, dukungan, dan monitoring.
 - **V0.0.0.20** — Fondasi tujuh ruang, panel admin, pesan terjadwal, dan backup terenkripsi.
